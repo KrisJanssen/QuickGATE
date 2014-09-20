@@ -22,7 +22,7 @@ function varargout = QuickGATE(varargin)
 
 % Edit the above text to modify the response to help QuickGATE
 
-% Last Modified by GUIDE v2.5 18-Sep-2014 18:42:07
+% Last Modified by GUIDE v2.5 20-Sep-2014 16:32:27
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -66,6 +66,7 @@ guidata(hObject, handles);
 % Add path to external helper references.
 addpath('refs/PQTH');
 addpath('refs/uipos');
+addpath('Utility');
 
 % --- Outputs from this function are returned to the command line.
 function varargout = QuickGATE_OutputFcn(hObject, eventdata, handles) 
@@ -83,14 +84,24 @@ function btnExport_Callback(hObject, eventdata, handles)
 % hObject    handle to btnExport (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
+axes(handles.axesRight);
+img  = getframe(gca);
+imwrite(img.cdata,['MyImage_'  datestr(clock,'ddmmyyyyHHMMSSAM') '.png'],'png')
 
 % --- Executes on button press in btnGateOne.
 function btnGateOne_Callback(hObject, eventdata, handles)
 % hObject    handle to btnGateOne (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+handles = guidata(hObject);
 
+ gmin = str2double(get(handles.lowGateLeft, 'string'));
+ gmax = str2double(get(handles.highGateLeft, 'string'));
+
+[imdata, gmin, gmax] = ExtractImage(strcat(handles.path, handles.filename), gmin * 1E-9, gmax * 1E-9);
+    
+    axes(handles.axesLeft);
+    imagesc(imdata); 
 
 % --- Executes on button press in btnGateTwo.
 function btnGateTwo_Callback(hObject, eventdata, handles)
@@ -119,7 +130,9 @@ function figure1_ResizeFcn(hObject, eventdata, handles)
 % Coordinates expressed as:
 % origin (0,0) = bottom left
 % width, heigt
-setpos(handles.btnExport, '0.05nz 0.01nz 0.9nz 0.1nz');
+setpos(handles.btnColor, '0.05nz 0.01nz 0.25nz 0.1nz');
+setpos(handles.chkColorBar, '0.35nz 0.01nz 0.25nz 0.1nz');
+setpos(handles.btnExport, '0.65nz 0.01nz 0.25nz 0.1nz');
 
 setpos(handles.btnGateOne, '0.25nz 0.12nz 0.2nz 0.1nz');
 setpos(handles.lowGateLeft, '0.05nz 0.12nz 0.1nz 0.1nz');
@@ -132,6 +145,10 @@ setpos(handles.highGateRight, '0.65nz 0.12nz 0.1nz 0.1nz');
 setpos(handles.axesLeft, '0.05nz 0.3nz 0.4nz 0.6nz');
 setpos(handles.axesRight, '0.55nz 0.3nz 0.4nz 0.6nz');
 
+axes(handles.axesRight);
+axis square;
+axes(handles.axesLeft);
+axis square;
 
 
 function lowGateLeft_Callback(hObject, eventdata, handles)
@@ -245,9 +262,45 @@ else
     
     axes(handles.axesLeft);
     imagesc(imdata); 
+    colormap(hot);
     
     axes(handles.axesRight);
     imagesc(imdata); 
+    colormap(hot);
     
+    % Save variables for access by other callbacks.
     guidata(hObject, handles);
+end
+
+
+% --- Executes on button press in btnColor.
+function btnColor_Callback(hObject, eventdata, handles)
+% hObject    handle to btnColor (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+colormapeditor
+
+
+% --- Executes on button press in chkColorBar.
+function chkColorBar_Callback(hObject, eventdata, handles)
+% hObject    handle to chkColorBar (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hint: get(hObject,'Value') returns toggle state of chkColorBar
+if get(hObject,'Value')
+    axes(handles.axesLeft);
+    colorbar;
+    axis square;
+    axes(handles.axesRight);
+    colorbar;
+    axis square;
+else
+    axes(handles.axesLeft);
+    colorbar('delete');
+    axis square;
+
+    axes(handles.axesRight);
+    colorbar('delete');
+    axis square;
 end
