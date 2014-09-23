@@ -22,7 +22,7 @@ function varargout = QuickGATE(varargin)
 
 % Edit the above text to modify the response to help QuickGATE
 
-% Last Modified by GUIDE v2.5 20-Sep-2014 16:32:27
+% Last Modified by GUIDE v2.5 23-Sep-2014 09:38:16
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -101,7 +101,7 @@ handles = guidata(hObject);
 [imdata, gmin, gmax] = ExtractImage(strcat(handles.path, handles.filename), gmin * 1E-9, gmax * 1E-9);
     
     axes(handles.axesLeft);
-    imagesc(imdata); 
+    imagesc(imdata(:,:,1)); 
 
 % --- Executes on button press in btnGateTwo.
 function btnGateTwo_Callback(hObject, eventdata, handles)
@@ -117,7 +117,7 @@ handles = guidata(hObject);
 [imdata, gmin, gmax] = ExtractImage(strcat(handles.path, handles.filename), gmin * 1E-9, gmax * 1E-9);
     
     axes(handles.axesRight);
-    imagesc(imdata); 
+    imagesc(imdata(:,:,1)); 
 
 
 % --- Executes when figure1 is resized.
@@ -130,9 +130,10 @@ function figure1_ResizeFcn(hObject, eventdata, handles)
 % Coordinates expressed as:
 % origin (0,0) = bottom left
 % width, heigt
-setpos(handles.btnColor, '0.05nz 0.01nz 0.25nz 0.1nz');
-setpos(handles.chkColorBar, '0.35nz 0.01nz 0.25nz 0.1nz');
-setpos(handles.btnExport, '0.65nz 0.01nz 0.25nz 0.1nz');
+setpos(handles.btnColor, '0.05nz 0.01nz 0.1875nz 0.1nz');
+setpos(handles.btnLTROI, '0.2875nz 0.01nz 0.1875nz 0.1nz');
+setpos(handles.chkColorBar, '0.525nz 0.01nz 0.1875nz 0.1nz');
+setpos(handles.btnExport, '0.7625nz 0.01nz 0.1875nz 0.1nz');
 
 setpos(handles.btnGateOne, '0.25nz 0.12nz 0.2nz 0.1nz');
 setpos(handles.lowGateLeft, '0.05nz 0.12nz 0.1nz 0.1nz');
@@ -261,12 +262,14 @@ else
     ExtractImage(strcat(handles.path, handles.filename), 0, 1);
     
     axes(handles.axesLeft);
-    imagesc(imdata); 
+    imagesc(imdata(:,:,1)); 
     colormap(hot);
     
     axes(handles.axesRight);
-    imagesc(imdata); 
+    imagesc(imdata(:,:,1)); 
     colormap(hot);
+    
+    handles.rawdata = imdata;
     
     % Save variables for access by other callbacks.
     guidata(hObject, handles);
@@ -278,7 +281,15 @@ function btnColor_Callback(hObject, eventdata, handles)
 % hObject    handle to btnColor (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-colormapeditor
+%colormapeditor
+Y = improfile;
+n = size(Y,1);
+X = linspace(0,n*20,n).';
+f = fit(X,Y,'gauss2');
+figure
+plot(X,Y)
+figure 
+plot(f,Y)
 
 
 % --- Executes on button press in chkColorBar.
@@ -304,3 +315,43 @@ else
     colorbar('delete');
     axis square;
 end
+
+
+% --- Executes on button press in btnLTROI.
+function btnLTROI_Callback(hObject, eventdata, handles)
+% hObject    handle to btnLTROI (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+h = imrect;
+handles = guidata(hObject);
+
+if isfield(handles, 'rect')
+    delete(handles.rect)
+end
+pos = int32(round(getPosition(h)));
+
+
+deltax = abs(pos(1,1) - pos(1,3));
+deltay = abs(pos(1,2) - pos(1,4));
+
+buffersize = deltax * deltay * 500;
+
+startstops = zeros(buffersize, 1);
+
+for i=1:deltay
+   for j=1:deltax
+       
+       startstops((((i * j) - 1) * 500) + 1:(i * j * 500)) = handles.rawdata(i,j,2:end);
+   end
+end
+
+A = startstops(find(startstops)) * 1E9;
+
+handles.rect = h;
+guidata(hObject, handles);
+figure;
+hist(A,50);
+
+
+

@@ -311,9 +311,6 @@ LineDuration = AbsoluteTimeTag(LineEnd) - AbsoluteTimeTag(LineStart);
 % The duration of a pixel.
 PixelDuration = round(LineDuration / pixels);
 
-% Pre-allocate the image data store.
-ImageData = zeros(pixels,pixels);
-
 % Gating variables.
 
 % Check we have sensible values for gating.
@@ -360,8 +357,19 @@ GatingLogical = ...
 % marker.
 CurrentLineStart = LineStart;
 
+% Pre-allocate the image data store, including start stop times.
+ImageData = zeros(pixels,pixels, 501);
+
 % Cycle through the lines.
 for i=1:1:pixels
+    
+    CurrentLineEnd = LineMarkerIndices(i);
+    
+    % The records that are on the current line.
+    LineData = AbsoluteTimeTag(CurrentLineStart:CurrentLineEnd);
+    LineValid = Valid(CurrentLineStart:CurrentLineEnd);
+    LineGatingLogical = GatingLogical(CurrentLineStart:CurrentLineEnd);
+    LineChannelCorrected_s = ChannelCorrected_s(CurrentLineStart:CurrentLineEnd);
     
     %Cycle through the pixels in each line.
     for j=1:1:pixels
@@ -373,18 +381,21 @@ for i=1:1:pixels
         pstart = AbsoluteTimeTag(LineMarkerIndices(i)) - ...
             (PixelDuration * j);
         
-        CurrentLineEnd = LineMarkerIndices(i);
+        ssrecordindices = find(LineData < pend & LineData > pstart & LineValid);
         
-        % The records that are on the current line.
-        LineData = AbsoluteTimeTag(CurrentLineStart:CurrentLineEnd);
-        LineGatingLogical = GatingLogical(CurrentLineStart:CurrentLineEnd);
+        nel = size(ssrecordindices, 1);
         
-        ImageData(i, pixels - j + 1) = size(find(LineData < pend & LineData > pstart & LineGatingLogical),1); 
+        ImageData(i, pixels - j + 1, 1) = size(find(LineData < pend & LineData > pstart & LineGatingLogical),1); 
+        
+        ImageData(i, pixels - j + 1, 2:nel + 1) = LineChannelCorrected_s(ssrecordindices);
+        
     end
     
     CurrentLineStart = LineMarkerIndices(i);
     
 end
+
+
 
 fprintf(1,' Ready!\n');
 fprintf(1,'\nStatistics:\n');
