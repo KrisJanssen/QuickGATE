@@ -22,7 +22,7 @@ function varargout = QuickGATE(varargin)
 
 % Edit the above text to modify the response to help QuickGATE
 
-% Last Modified by GUIDE v2.5 23-Sep-2014 09:38:16
+% Last Modified by GUIDE v2.5 23-Sep-2014 18:19:42
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -93,15 +93,8 @@ function btnGateOne_Callback(hObject, eventdata, handles)
 % hObject    handle to btnGateOne (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-handles = guidata(hObject);
 
- gmin = str2double(get(handles.lowGateLeft, 'string'));
- gmax = str2double(get(handles.highGateLeft, 'string'));
-
-[imdata, gmin, gmax] = ExtractImage(strcat(handles.path, handles.filename), gmin * 1E-9, gmax * 1E-9);
-    
-    axes(handles.axesLeft);
-    imagesc(imdata(:,:,1)); 
+render(hObject, 'left');
 
 % --- Executes on button press in btnGateTwo.
 function btnGateTwo_Callback(hObject, eventdata, handles)
@@ -109,47 +102,7 @@ function btnGateTwo_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-handles = guidata(hObject);
-
- gmin = str2double(get(handles.lowGateRight, 'string'));
- gmax = str2double(get(handles.highGateRight, 'string'));
-
-[imdata, gmin, gmax] = ExtractImage(strcat(handles.path, handles.filename), gmin * 1E-9, gmax * 1E-9);
-    
-    axes(handles.axesRight);
-    imagesc(imdata(:,:,1)); 
-
-
-% --- Executes when figure1 is resized.
-function figure1_ResizeFcn(hObject, eventdata, handles)
-% hObject    handle to figure1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% We set control positions using normalized (nz) coorsinates.
-% Coordinates expressed as:
-% origin (0,0) = bottom left
-% width, heigt
-setpos(handles.btnColor, '0.05nz 0.01nz 0.1875nz 0.1nz');
-setpos(handles.btnLTROI, '0.2875nz 0.01nz 0.1875nz 0.1nz');
-setpos(handles.chkColorBar, '0.525nz 0.01nz 0.1875nz 0.1nz');
-setpos(handles.btnExport, '0.7625nz 0.01nz 0.1875nz 0.1nz');
-
-setpos(handles.btnGateOne, '0.25nz 0.12nz 0.2nz 0.1nz');
-setpos(handles.lowGateLeft, '0.05nz 0.12nz 0.1nz 0.1nz');
-setpos(handles.highGateLeft, '0.15nz 0.12nz 0.1nz 0.1nz');
-
-setpos(handles.btnGateTwo, '0.75nz 0.12nz 0.2nz 0.1nz');
-setpos(handles.lowGateRight, '0.55nz 0.12nz 0.1nz 0.1nz');
-setpos(handles.highGateRight, '0.65nz 0.12nz 0.1nz 0.1nz');
-
-setpos(handles.axesLeft, '0.05nz 0.3nz 0.4nz 0.6nz');
-setpos(handles.axesRight, '0.55nz 0.3nz 0.4nz 0.6nz');
-
-axes(handles.axesRight);
-axis square;
-axes(handles.axesLeft);
-axis square;
+render(hObject, 'right');
 
 
 function lowGateLeft_Callback(hObject, eventdata, handles)
@@ -253,26 +206,16 @@ function uipushopen_ClickedCallback(hObject, eventdata, handles)
 if path == 0
     return
 else
-    handles = guidata(hObject);
     
-    handles.filename = file;
     handles.path = path;
-    
-    [imdata, gmin, gmax] = ...
-    ExtractImage(strcat(handles.path, handles.filename), 0, 1);
-    
-    axes(handles.axesLeft);
-    imagesc(imdata(:,:,1)); 
-    colormap(hot);
-    
-    axes(handles.axesRight);
-    imagesc(imdata(:,:,1)); 
-    colormap(hot);
-    
-    handles.rawdata = imdata;
+    handles.file = file;
     
     % Save variables for access by other callbacks.
     guidata(hObject, handles);
+    
+    % Render both axes.
+    render(hObject, '');
+    
 end
 
 
@@ -301,10 +244,10 @@ function chkColorBar_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of chkColorBar
 if get(hObject,'Value')
     axes(handles.axesLeft);
-    colorbar;
+    colorbar('southoutside');
     axis square;
     axes(handles.axesRight);
-    colorbar;
+    colorbar('southoutside');
     axis square;
 else
     axes(handles.axesLeft);
@@ -323,15 +266,28 @@ function btnLTROI_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-h = imrect;
+% Get all handles.
 handles = guidata(hObject);
 
+% We will always define the ROI on the left axes.
+axes(handles.axesLeft);
+
+% Get an ROI.
+h = imrect;
+
+% If we previously defined an ROI, delete it.
 if isfield(handles, 'rect')
     delete(handles.rect)
 end
 
+% Get the extents of the ROI returned as coordinates top left X, top left
+% Y, width, height.
 pos = int32(round(getPosition(h)));
 
+% The start-stop data is in the output of the render operation as a 3D
+% matrix of dimensions : (pixelsX, pixelsY, 501) with the actual image data
+% in (pixelsX, pixelsY, 1) and all start stop times in (:,:,2:501). We will
+% now put the start-stop times for the ROI only in a linear array.
 buffersize = pos(1,3) * pos(1,4) * 500;
 
 startstops = zeros(buffersize, 1);
@@ -342,12 +298,100 @@ for i=pos(1,2):pos(1,2) + pos(1,4) - 1
    end
 end
 
-A = startstops(find(startstops)) * 1E9;
+% Only keep non-zero values and express them in ns.
+startstop_ns = startstops(find(startstops)) * 1E9;
 
+% Store the handle to the just-defined ROI.
 handles.rect = h;
 guidata(hObject, handles);
+
+% Plot the histogram.
 figure;
-hist(A,50);
+hist(startstop_ns,100);
 
+function txtOutput_Callback(hObject, eventdata, handles)
+% hObject    handle to txtOutput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
 
+% Hints: get(hObject,'String') returns contents of txtOutput as text
+%        str2double(get(hObject,'String')) returns contents of txtOutput as a double
 
+% --- Executes during object creation, after setting all properties.
+function txtOutput_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to txtOutput (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
+
+function updateUI(hObject, imdata, gmin, gmax, output, updateaxes)
+
+% Get all handles.
+handles = guidata(hObject);
+
+switch updateaxes
+    case 'left'
+        axes(handles.axesLeft);
+        imagesc(imdata); 
+        colormap(hot);
+        set(handles.lowGateLeft, 'string', sprintf('%5.2f', gmin));
+        set(handles.highGateLeft, 'string', sprintf('%5.2f', gmax));
+ gmax = str2double(get(handles.highGateLeft, 'string'));
+    case 'right'
+        axes(handles.axesRight);
+        imagesc(imdata);
+        colormap(hot);
+        set(handles.lowGateRight, 'string', sprintf('%5.2f', gmin));
+        set(handles.highGateRight, 'string', sprintf('%5.2f', gmax));
+    otherwise
+        axes(handles.axesLeft);
+        imagesc(imdata); 
+        colormap(hot);
+        set(handles.lowGateLeft, 'string', sprintf('%5.2f', gmin));
+        set(handles.highGateLeft, 'string', sprintf('%5.2f', gmax));
+        
+        axes(handles.axesRight);
+        imagesc(imdata);
+        colormap(hot);
+        set(handles.lowGateRight, 'string', sprintf('%5.2f', gmin));
+        set(handles.highGateRight, 'string', sprintf('%5.2f', gmax));
+end
+
+% Show output to the user.
+set(handles.txtOutput, 'string', output);
+
+function [ gmin, gmax ] = render(hObject, updateaxes)
+
+% Get all handles.
+handles = guidata(hObject);
+
+switch updateaxes
+    case 'left'
+        gmin = str2double(get(handles.lowGateLeft, 'string'));
+        gmax = str2double(get(handles.highGateLeft, 'string'));
+    case 'right'
+        gmin = str2double(get(handles.lowGateRight, 'string'));
+        gmax = str2double(get(handles.highGateRight, 'string'));
+    otherwise
+        gmin = 0;
+        gmax = 100;
+end
+
+[ ImageData, gmin, gmax, messages ] = ...
+    ExtractImage(strcat(handles.path, handles.file), gmin, gmax);
+
+updateUI(hObject, ...
+    ImageData(:,:,1), ...
+    gmin, ...
+    gmax, ...
+    messages, ...
+    updateaxes);
+
+handles.rawdata = ImageData;
+
+guidata(hObject, handles);

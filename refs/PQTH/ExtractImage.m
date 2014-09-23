@@ -1,4 +1,4 @@
-function [ ImageData, gmin, gmax ] = ExtractImage( filepath, gmin, gmax )
+function [ ImageData, gmin, gmax, messages ] = ExtractImage( filepath, gmin, gmax )
 %EXTRACTIMAGE allows images to be extracted from PQ .t3r files.
 %   Detailed explanation goes here
 
@@ -321,11 +321,11 @@ end
 MinimumBin = double(min(Channel(logical(Valid))));
 MaximumBin = double(max(Channel(logical(Valid))));
 
-AbsoluteMaxGate_ns = MinimumBin * Board_Resolution * 1E-09;
+AbsoluteMaxGate_ns = MinimumBin * Board_Resolution;
 
 % If we exceed the maximally possible gating time, coerce to that value.
-if gmax > AbsoluteMaxGate_ns
-    gmax = AbsoluteMaxGate_ns;
+if gmax > AbsoluteMaxGate_ns * 2
+    gmax = AbsoluteMaxGate_ns * 2;
 end
 
 % Photons that are closer than ca. 800 bins will actually be referenced to
@@ -344,8 +344,8 @@ end;
 
 % We get a logical indexer for the gating condition.
 GatingLogical = ...
-    (gmin <= ChannelCorrected_s) & ...
-    (gmax >= ChannelCorrected_s);
+    (gmin * 1E-09 <= ChannelCorrected_s) & ...
+    (gmax * 1E-09 >= ChannelCorrected_s);
 
 % We will construct image pixel values by counting the number of photon
 % records that fall in a certain time bin of duration PixelDuration. For
@@ -395,12 +395,11 @@ for i=1:1:pixels
     
 end
 
-
-
-fprintf(1,' Ready!\n');
-fprintf(1,'\nStatistics:\n');
-fprintf(1,'\n%u photon records', Photon);
-fprintf(1,'\n%u overflows', Overflow);
-fprintf(1,'\n%u markers', Marker);
+messages = strcat(...
+    sprintf('\nReady!\n'),...
+    sprintf('\nStatistics:\n'),...
+    sprintf('\n%u photon records', size(find(Valid),1)),...
+    sprintf('\n%u overflows', NoOfOverflows),...
+    sprintf('\n%u Line markers\n', pixels));
 
 end
