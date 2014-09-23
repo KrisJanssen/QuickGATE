@@ -329,19 +329,15 @@ handles = guidata(hObject);
 if isfield(handles, 'rect')
     delete(handles.rect)
 end
+
 pos = int32(round(getPosition(h)));
 
-
-deltax = abs(pos(1,1) - pos(1,3));
-deltay = abs(pos(1,2) - pos(1,4));
-
-buffersize = deltax * deltay * 500;
+buffersize = pos(1,3) * pos(1,4) * 500;
 
 startstops = zeros(buffersize, 1);
 
-for i=1:deltay
-   for j=1:deltax
-       
+for i=pos(1,2):pos(1,2) + pos(1,4) - 1
+   for j=pos(1,1):pos(1,1) + pos(1,3) - 1
        startstops((((i * j) - 1) * 500) + 1:(i * j * 500)) = handles.rawdata(i,j,2:end);
    end
 end
