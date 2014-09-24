@@ -1,8 +1,20 @@
 function [ ImageData, gmin, gmax, messages ] = ExtractImage( filepath, gmin, gmax )
 %EXTRACTIMAGE allows images to be extracted from PQ .t3r files.
-%   Detailed explanation goes here
+%   Parameters:
+%   
+%   filepath:   string representing the full path to a .t3r file
+%   gmin:       lower bound gating time in ns
+%   gmax:       upper bound gating time in ns
+%
+%   Output:
+%
+%   ImageData:  pixelsX * pixelsY * 501 array of gated image data and full
+%               start-stop times, grouped per pixel
+%   gmin:       Actually applied lower bound gating time in ns (coerced)
+%   gmax:       Actually applied upper bound gating time in ns (coerced)
+%   messages:   Some information on the processed file
 
-%% Load some header info for debug display
+%% Load some header info for debug display to console
 % Demo for accessing TimeHarp TTTR data files (*.t3r) from MATLAB
 % TimeHarp 200, Software version 6.x, Format version 6.0
 % Tested with Matlab  6 and 7
@@ -258,6 +270,8 @@ Marker = 0;
 
 % Read the actual data from disk as uint32.
 Data = uint32(fread(fid, 'uint32'));
+
+% Close the file handle, all data is in memory now.
 fclose(fid);
 
 % Extract rudimentary info from the data:
@@ -265,6 +279,10 @@ fclose(fid);
 % 2) Channel holds the REVERSE start-stop channel (i.e.) time bin.
 % 3) Route holds routing information (no shit!)
 % 4) Valid holds information on the type of data in Channel (1 = photon).
+%
+% All data records are 32 bit numbers. By using AND and SHIFT operations
+% with correct values, we can extract sub-bits holding particular
+% information.
 TimeTag = bitand(Data(:),65535);              %the lowest 16 bits
 Channel = bitand(bitshift(Data(:),-16),4095); %the next 12 bits
 Route   = bitand(bitshift(Data(:),-28),3);    %the next 2 bits
@@ -276,36 +294,55 @@ Valid   = logical(bitand(bitshift(Data(:),-30),1));    %the next bit
 LineMarkerIndices = find(~Valid & bitand(Channel,7) == 4);
 
 % We assume square images so the number of lines is the number of pixels in
-% each dimension.
+% each dimension (X&Y).
 pixels = size(LineMarkerIndices,1);
 
 % We will construct an array with the absolute (relative to measurement 
 % start) time tags.
 AbsoluteTimeTag = TimeTag;
+
+% To do so, we need to keep track of the number of times the macro time
+% counter (2^16) overflowed. We start at 0 obviously.
 NoOfOverflows = 0;
 
-% Reconstruct the absolute time tags along the experiment time axis. We
-% need this to reconstruct the actual image. Once we have the absolute
-% macro time, we can work out the delta between Frame trigger and the first
-% line trigger, i.e. the time it takes to complete a scanline. 
+% Reconstruct the absolute time tags along the experiment time axis (macro 
+% time).
+%
+% The TSPC can only count to 2^16 so if an experiment takes longer, it
+% counts the overflows of the macro time counter.
+%
+% We need the absolute macro time to reconstruct the image. Once we have 
+% the absolute macro time, we can work out the delta between Frame trigger 
+% and the first line trigger, i.e. the time it takes to complete a scanline. 
 %
 % Moreover, having worked out the duration of the scanline, we can
 % calculate back from the line marker such that we can easily get rid of
 % the photons generated during the return of the galvo.
+%
+% Calculated absolute values are still uint32! No need to convert to 'real'
+% SI units.
 for i=1:1:NumberOfRecords
+    
+    %Running through all records, if we meet anything other than an
+    %overflow record, we van just calculate its absolute time based on
+    %current overflow count and its timetag.
     AbsoluteTimeTag(i) = NoOfOverflows * 65536 + TimeTag(i);
+    
+    % We are running through all records so if we encounter an overflow
+    % (signified by bitand(..., 2048), we add 1 to the overflow count.
     if bitand(Channel(i),2048)
         NoOfOverflows = NoOfOverflows + 1;
     end;
 end;
 
-% We get the specific indices of the first frame- and line markers. These
-% are the invalid (no photons!) records of type marker with values 4 and 2 
-% respectively. 
+% We get the specific indices of the FIRST (hense the find (..., 1) frame- 
+% and line markers. These are the INVALID (no photons!) records of type 
+% marker with values 4 and 2 respectively. 
 LineEnd = find(~Valid & bitand(Channel,7) == 4, 1);
 LineStart = find(~Valid & bitand(Channel,7) == 2, 1);
 
-% The line duration in as an integer time tag.
+% We therefore need to look up the corresponding index in "AbsoluteTimeTag" 
+% because we are interested in absolute time. 
 LineDuration = AbsoluteTimeTag(LineEnd) - AbsoluteTimeTag(LineStart);
 
 % The duration of a pixel.
@@ -313,24 +350,34 @@ PixelDuration = round(LineDuration / pixels);
 
 % Gating variables.
 
-% Check we have sensible values for gating.
+% Check we have sensible values for gating. If not, flip them around/coerce 
+% them.
 if gmin >= gmax
-    return
+    temp = gmin;
+    gmax = gmin;
+    gmin = temp;
 end
 
-MinimumBin = double(min(Channel(logical(Valid))));
-MaximumBin = double(max(Channel(logical(Valid))));
+% In reality, not all reverse start-stop time bins of the TCSPC will be 
+% filled. Moreover, some bins will contain photons with apparent arrival 
+% times that greatly exceed the SYNC period.
+% We will check these values now such that we can act accordingly later on
+% Or at the very least report them to the user.
+MinimumBin = double(min(Channel(Valid)));
+MaximumBin = double(max(Channel(Valid)));
 
-AbsoluteMaxGate_ns = MinimumBin * Board_Resolution;
+% alculate the real start stop time range for reporting.
+MinimumReverseStartStop_ns =  MinimumBin * Board_Resolution;
+MaximumReverseStartStop_ns =  MaximumBin * Board_Resolution;
 
-% If we exceed the maximally possible gating time, coerce to that value.
-if gmax > AbsoluteMaxGate_ns * 2
-    gmax = AbsoluteMaxGate_ns * 2;
-end
-
-% Photons that are closer than ca. 800 bins will actually be referenced to
-% the next pulse so we need to substract 1.0/SYNCRate from their channel
-% value.
+% Photons that are closer than a minimum start-stop time will actually be 
+% referenced to 'third' pulse, relative to the pulse that triggered the 
+% photon. To get 'real', 'forward' start-stop times, we need to perform
+% some corrections. If a specific s-s time fals within the SYNC period, we
+% substract its value from SYNC period to get the 'forward' s-s value. If
+% its value is larger than SYNC period, we substract the reverse s-s- time
+% from TWICE the SYNC period. The SYNC period is available as SYNCRATE in
+% Hz, so we need to take into account proper conversions of time (s vs ns).
 ChannelCorrected_s = double(Channel);
 
 for i=1:1:NumberOfRecords
@@ -342,7 +389,10 @@ for i=1:1:NumberOfRecords
     end
 end;
 
-% We get a logical indexer for the gating condition.
+% Now that we finally have 'forward' start stop times, which have an actual
+% physical meaning, we can get a logical indexer signifying compliance 
+% with the gating condition. Again we convert gating times in ns to s. We
+% are greedy with this check (we include gmin and gmax itself.
 GatingLogical = ...
     (gmin * 1E-09 <= ChannelCorrected_s) & ...
     (gmax * 1E-09 >= ChannelCorrected_s);
@@ -357,7 +407,13 @@ GatingLogical = ...
 % marker.
 CurrentLineStart = LineStart;
 
-% Pre-allocate the image data store, including start stop times.
+% Pre-allocate the image data store, including start stop times. As such,
+% ImageData(:,:,1) will hold the image itself and (:,:,2:501) will hold all
+% individual start stop times, grouped per pixel.
+%                                                                             
+% Please note that the current solution assumes there will be no more than
+% 500 start stop times per pixel so this imposes a limitation on the
+% maximum count rate you can have.
 ImageData = zeros(pixels,pixels, 501);
 
 % Cycle through the lines.
@@ -396,10 +452,13 @@ for i=1:1:pixels
 end
 
 messages = strcat(...
-    sprintf('\nReady!\n'),...
     sprintf('\nStatistics:\n'),...
     sprintf('\n%u photon records', size(find(Valid),1)),...
     sprintf('\n%u overflows', NoOfOverflows),...
-    sprintf('\n%u Line markers\n', pixels));
+    sprintf('\n%u Line markers\n', pixels),...
+    sprintf('\n%5.2f (ms) Pixel Dwell time\n', double(PixelDuration) * 100E-6),...
+    sprintf('\n%5.2f (ns) MIN rev Start-Stop\n', MinimumReverseStartStop_ns),...
+    sprintf('\n%5.2f (ns) MAX rev Start-Stop\n', MaximumReverseStartStop_ns));
+
 
 end
