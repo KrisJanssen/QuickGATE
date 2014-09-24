@@ -381,13 +381,17 @@ MaximumReverseStartStop_ns =  MaximumBin * Board_Resolution;
 ChannelCorrected_s = double(Channel);
 
 for i=1:1:NumberOfRecords
-    RevStartStopTime_s = double(Channel(i)) * Board_Resolution * 1E-09;
+    RevStartStopTime_s = double(Channel(i)) * Board_Resolution * 1.0E-09;
     if RevStartStopTime_s > 1.0 / SYNCRate
         ChannelCorrected_s(i) = 2.0 / SYNCRate - RevStartStopTime_s;
     else
         ChannelCorrected_s(i) = 1.0 / SYNCRate - RevStartStopTime_s;
     end
 end;
+
+% alculate the real start stop time range for reporting.
+MinimumStartStop_ns =  double(min(ChannelCorrected_s(Valid))) * 1.0E9;
+MaximumStartStop_ns =  double(max(ChannelCorrected_s(Valid))) * 1.0E9;
 
 % Now that we finally have 'forward' start stop times, which have an actual
 % physical meaning, we can get a logical indexer signifying compliance 
@@ -458,7 +462,9 @@ messages = strcat(...
     sprintf('\n%u Line markers\n', pixels),...
     sprintf('\n%5.2f (ms) Pixel Dwell time\n', double(PixelDuration) * 100E-6),...
     sprintf('\n%5.2f (ns) MIN rev Start-Stop\n', MinimumReverseStartStop_ns),...
-    sprintf('\n%5.2f (ns) MAX rev Start-Stop\n', MaximumReverseStartStop_ns));
+    sprintf('\n%5.2f (ns) MAX rev Start-Stop\n', MaximumReverseStartStop_ns),...
+    sprintf('\n%5.2f (ns) MIN Start-Stop\n', MinimumStartStop_ns),...
+    sprintf('\n%5.2f (ns) MAX Start-Stop\n', MaximumStartStop_ns));
 
 
 end

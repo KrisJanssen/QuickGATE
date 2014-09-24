@@ -244,10 +244,10 @@ function chkColorBar_Callback(hObject, eventdata, handles)
 % Hint: get(hObject,'Value') returns toggle state of chkColorBar
 if get(hObject,'Value')
     axes(handles.axesLeft);
-    colorbar('southoutside');
+    colorbar('northoutside');
     axis square;
     axes(handles.axesRight);
-    colorbar('southoutside');
+    colorbar('northoutside');
     axis square;
 else
     axes(handles.axesLeft);
