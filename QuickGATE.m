@@ -367,7 +367,7 @@ end
 set(handles.txtOutput, 'string', output);
 
 function [ gmin, gmax ] = render(hObject, updateaxes)
-profile('on', '-detail', 'builtin')
+%profile('on', '-detail', 'builtin')
 % Get all handles.
 handles = guidata(hObject);
 
@@ -397,5 +397,5 @@ handles.rawdata = ImageData;
 
 guidata(hObject, handles);
 
-profile off
-profile viewer
+%profile off
+%profile viewer
