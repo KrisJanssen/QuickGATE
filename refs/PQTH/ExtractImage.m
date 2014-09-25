@@ -407,8 +407,9 @@ RevStartStopTime_s = double(Channel) * Board_Resolution * 1.0E-09;
 
 ChannelCorrected_s(RevStartStopTime_s > 1.0 / SYNCRate) = ...
     2.0 / SYNCRate - RevStartStopTime_s(RevStartStopTime_s > 1.0 / SYNCRate);
+
 ChannelCorrected_s(RevStartStopTime_s <= 1.0 / SYNCRate) = ...
-    2.0 / SYNCRate - RevStartStopTime_s(RevStartStopTime_s <= 1.0 / SYNCRate);
+    1.0 / SYNCRate - RevStartStopTime_s(RevStartStopTime_s <= 1.0 / SYNCRate);
 
 % for i=1:1:NumberOfRecords
 %     RevStartStopTime_s = double(Channel(i)) * Board_Resolution * 1.0E-09;
