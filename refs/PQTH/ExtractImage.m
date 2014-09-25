@@ -26,7 +26,7 @@ function [ ImageData, gmin, gmax, messages ] = ExtractImage( filepath, gmin, gma
 % this would take in case of large files. Of course you can change this, 
 % e.g. if your files are not too big. 
 % Otherwise it is best process the data on the fly and keep only the results.
-
+%profile('on', '-detail', 'builtin')
 
 fprintf(1,'\n');
 
@@ -43,7 +43,7 @@ fprintf(1,'\n');
 % Read the TxtHdr
 %
 
-Ident = char(fread(fid, 16, 'char'));
+Ident = fread(fid, 16, '*char');
 fprintf(1,'Ident: %s\n', Ident);
 
 FormatVersion = deblank(char(fread(fid, 6, 'char')'));
@@ -56,18 +56,18 @@ end;
 
 
 
-CreatorName = char(fread(fid, 18, 'char'));
+CreatorName = fread(fid, 18, '*char');
 fprintf(1,'Creator name: %s\n', CreatorName);
 
-CreatorVersion = char(fread(fid, 12, 'char'));
+CreatorVersion = fread(fid, 12, '*char');
 fprintf(1,'Creator version: %s\n', CreatorVersion);
 
-FileTime = char(fread(fid, 18, 'char'));
+FileTime = fread(fid, 18, '*char');
 fprintf(1,'File creation: %s\n', FileTime);
 
-CRLF = char(fread(fid, 2, 'char'));
+CRLF = fread(fid, 2, '*char');
 
-Comment = char(fread(fid, 256, 'char'));
+Comment = fread(fid, 256, '*char');
 fprintf(1,'Comment: %s\n', Comment);
 
 
@@ -135,6 +135,9 @@ fprintf(1,'Display Count Axis To: %d\n', DispCountAxisTo);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+DispCurveMapTo = zeros(8,1);
+DispCurveShow = zeros(8,1);
+
 for i = 1:8
 DispCurveMapTo(i) = fread(fid, 1, 'int32');
 DispCurveShow(i) = fread(fid, 1, 'int32');
@@ -145,6 +148,10 @@ fprintf(1,'                Show: %d\n', DispCurveShow(i));
 end;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+ParamStart = zeros(3,1);
+ParamStep = zeros(3,1);
+ParamEnd = zeros(3,1);
 
 for i = 1:3
 ParamStart(i) = fread(fid, 1, 'float');
@@ -174,7 +181,7 @@ fprintf(1,'Repeat Time: %d\n', RepatTime);
 RepeatWait = fread(fid, 1, 'int32');
 fprintf(1,'Repeat Wait Time: %d\n', RepeatWait);
 
-ScriptName = setstr(fread(fid, 20, 'char'));
+ScriptName = fread(fid, 20, '*char');
 fprintf(1,'Script Name: %s\n', ScriptName);
 
 
@@ -189,10 +196,10 @@ fprintf(1,'            Board Header:            \n');
 fprintf(1,'-------------------------------------\n');
 fprintf(1,'\n');
 
-HardwareIdent = char(fread(fid, 16, 'char'));
+HardwareIdent = fread(fid, 16, '*char');
 fprintf(1,'Hardware Identifier: %s\n', HardwareIdent);
 
-HardwareVersion = char(fread(fid, 8, 'char'));
+HardwareVersion = fread(fid, 8, '*char');
 fprintf(1,'Hardware Version: %s\n', HardwareVersion);
 
 Board_BoardSerial = fread(fid, 1, 'int32');
@@ -321,7 +328,7 @@ NoOfOverflows = 0;
 %
 % Calculated absolute values are still uint32! No need to convert to 'real'
 % SI units.
-for i=1:1:NumberOfRecords
+for i=1:NumberOfRecords
     
     %Running through all records, if we meet anything other than an
     %overflow record, we van just calculate its absolute time based on
@@ -353,9 +360,9 @@ PixelDuration = round(LineDuration / pixels);
 % Check we have sensible values for gating. If not, flip them around/coerce 
 % them.
 if gmin >= gmax
-    temp = gmin;
-    gmax = gmin;
-    gmin = temp;
+    PixelChannelCorrected_s = gmin;
+    gmin = gmax;
+    gmax = PixelChannelCorrected_s;
 end
 
 % In reality, not all reverse start-stop time bins of the TCSPC will be 
@@ -440,14 +447,12 @@ for i=1:1:pixels
         % The start time of pixel.
         pstart = AbsoluteTimeTag(LineMarkerIndices(i)) - ...
             (PixelDuration * j);
-        
-        ssrecordindices = find(LineData < pend & LineData > pstart & LineValid);
-        
-        nel = size(ssrecordindices, 1);
-        
-        ImageData(i, pixels - j + 1, 1) = size(find(LineData < pend & LineData > pstart & LineGatingLogical),1); 
-        
-        ImageData(i, pixels - j + 1, 2:nel + 1) = LineChannelCorrected_s(ssrecordindices);
+
+        ImageData(i, pixels - j + 1, 1) = length(LineData(LineData < pend & LineData > pstart & LineGatingLogical));
+
+        PixelChannelCorrected_s = LineChannelCorrected_s(LineData < pend & LineData > pstart & LineValid);
+        noOfElements = length(PixelChannelCorrected_s);
+        ImageData(i, pixels - j + 1, 2:noOfElements + 1) = PixelChannelCorrected_s;
         
     end
     
@@ -466,5 +471,6 @@ messages = strcat(...
     sprintf('\n%5.2f (ns) MIN Start-Stop\n', MinimumStartStop_ns),...
     sprintf('\n%5.2f (ns) MAX Start-Stop\n', MaximumStartStop_ns));
 
-
+%profile viewer
+%profile off
 end

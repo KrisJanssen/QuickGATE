@@ -64,6 +64,7 @@ guidata(hObject, handles);
 % uiwait(handles.figure1);
 
 % Add path to external helper references.
+addpath('refs');
 addpath('refs/PQTH');
 addpath('refs/uipos');
 addpath('Utility');
@@ -366,7 +367,7 @@ end
 set(handles.txtOutput, 'string', output);
 
 function [ gmin, gmax ] = render(hObject, updateaxes)
-
+%profile('on', '-detail', 'builtin')
 % Get all handles.
 handles = guidata(hObject);
 
@@ -395,3 +396,6 @@ updateUI(hObject, ...
 handles.rawdata = ImageData;
 
 guidata(hObject, handles);
+
+%profile off
+%profile viewer
