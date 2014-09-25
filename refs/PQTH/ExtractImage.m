@@ -328,19 +328,31 @@ NoOfOverflows = 0;
 %
 % Calculated absolute values are still uint32! No need to convert to 'real'
 % SI units.
-for i=1:NumberOfRecords
-    
-    %Running through all records, if we meet anything other than an
-    %overflow record, we van just calculate its absolute time based on
-    %current overflow count and its timetag.
-    AbsoluteTimeTag(i) = NoOfOverflows * 65536 + TimeTag(i);
-    
-    % We are running through all records so if we encounter an overflow
-    % (signified by bitand(..., 2048), we add 1 to the overflow count.
-    if bitand(Channel(i),2048)
-        NoOfOverflows = NoOfOverflows + 1;
-    end;
-end;
+
+% Get a 'logical' array indicating overflow.
+Overflows = bitand(Channel,2048) ~= 0;
+
+% AbsoluteTimeTag can be calculated in a vectorized fashion.
+AbsoluteTimeTag = uint32([0 ; cumsum(Overflows(1:end-1).*65536)]) + TimeTag;
+
+% Get the count of overflows as NoOfOverflows
+NoOfOverflows = sum(Overflows);
+
+% FOR EDUCATIONAL PURPOSES. The above three vectorized lines could be
+% expressed as a loop but this loop is an order of magnitude slower!
+% for i=1:NumberOfRecords
+%     
+%     %Running through all records, if we meet anything other than an
+%     %overflow record, we van just calculate its absolute time based on
+%     %current overflow count and its timetag.
+%     AbsoluteTimeTag(i) = NoOfOverflows * 65536 + TimeTag(i);
+%     
+%     % We are running through all records so if we encounter an overflow
+%     % (signified by bitand(..., 2048), we add 1 to the overflow count.
+%     if bitand(Channel(i),2048)
+%         NoOfOverflows = NoOfOverflows + 1;
+%     end;
+% end;
 
 % We get the specific indices of the FIRST (hense the find (..., 1) frame- 
 % and line markers. These are the INVALID (no photons!) records of type 
@@ -387,14 +399,25 @@ MaximumReverseStartStop_ns =  MaximumBin * Board_Resolution;
 % Hz, so we need to take into account proper conversions of time (s vs ns).
 ChannelCorrected_s = double(Channel);
 
-for i=1:1:NumberOfRecords
-    RevStartStopTime_s = double(Channel(i)) * Board_Resolution * 1.0E-09;
-    if RevStartStopTime_s > 1.0 / SYNCRate
-        ChannelCorrected_s(i) = 2.0 / SYNCRate - RevStartStopTime_s;
-    else
-        ChannelCorrected_s(i) = 1.0 / SYNCRate - RevStartStopTime_s;
-    end
-end;
+% FOR EDUCATIONAL PURPOSES: we use the vectorization approach to calculate
+% the actual corrected s-s times for all records instead of the loop
+% directly below. Matlab is bad at loops and avoiding it hear results in an
+% improvement of the executions speed of at least 1 order of magnitude.
+RevStartStopTime_s = double(Channel) * Board_Resolution * 1.0E-09;
+
+ChannelCorrected_s(RevStartStopTime_s > 1.0 / SYNCRate) = ...
+    2.0 / SYNCRate - RevStartStopTime_s(RevStartStopTime_s > 1.0 / SYNCRate);
+ChannelCorrected_s(RevStartStopTime_s <= 1.0 / SYNCRate) = ...
+    2.0 / SYNCRate - RevStartStopTime_s(RevStartStopTime_s <= 1.0 / SYNCRate);
+
+% for i=1:1:NumberOfRecords
+%     RevStartStopTime_s = double(Channel(i)) * Board_Resolution * 1.0E-09;
+%     if RevStartStopTime_s > 1.0 / SYNCRate
+%         ChannelCorrected_s(i) = 2.0 / SYNCRate - RevStartStopTime_s;
+%     else
+%         ChannelCorrected_s(i) = 1.0 / SYNCRate - RevStartStopTime_s;
+%     end
+% end;
 
 % alculate the real start stop time range for reporting.
 MinimumStartStop_ns =  double(min(ChannelCorrected_s(Valid))) * 1.0E9;
@@ -428,7 +451,7 @@ CurrentLineStart = LineStart;
 ImageData = zeros(pixels,pixels, 501);
 
 % Cycle through the lines.
-for i=1:1:pixels
+for i=1:pixels
     
     CurrentLineEnd = LineMarkerIndices(i);
     
