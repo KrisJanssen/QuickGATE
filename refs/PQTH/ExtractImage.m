@@ -290,12 +290,12 @@ fclose(fid);
 % All data records are 32 bit numbers. By using AND and SHIFT operations
 % with correct values, we can extract sub-bits holding particular
 % information.
-TimeTag = bitand(Data(:),65535);              %the lowest 16 bits
-Channel = bitand(bitshift(Data(:),-16),4095); %the next 12 bits
-Route   = bitand(bitshift(Data(:),-28),3);    %the next 2 bits
-Valid   = logical(bitand(bitshift(Data(:),-30),1));    %the next bit
+TimeTag = bitand(Data(:),65535);                        %the lowest 16 bits
+Channel = bitand(bitshift(Data(:),-16),4095);           %the next 12 bits
+%Route   = bitand(bitshift(Data(:),-28),3);             %the next 2 bits
+Valid   = logical(bitand(bitshift(Data(:),-30),1));     %the next bit
 
-% We will store indices of markers only for later use. To do so, we check 
+% We will store indices of line markers for later use. To do so, we check 
 % which records are not valid, i.e. do not contain photon arrival data and 
 % we check that a marker value exists.
 LineMarkerIndices = find(~Valid & bitand(Channel,7) == 4);
@@ -303,14 +303,6 @@ LineMarkerIndices = find(~Valid & bitand(Channel,7) == 4);
 % We assume square images so the number of lines is the number of pixels in
 % each dimension (X&Y).
 pixels = size(LineMarkerIndices,1);
-
-% We will construct an array with the absolute (relative to measurement 
-% start) time tags.
-AbsoluteTimeTag = TimeTag;
-
-% To do so, we need to keep track of the number of times the macro time
-% counter (2^16) overflowed. We start at 0 obviously.
-NoOfOverflows = 0;
 
 % Reconstruct the absolute time tags along the experiment time axis (macro 
 % time).
@@ -320,7 +312,8 @@ NoOfOverflows = 0;
 %
 % We need the absolute macro time to reconstruct the image. Once we have 
 % the absolute macro time, we can work out the delta between Frame trigger 
-% and the first line trigger, i.e. the time it takes to complete a scanline. 
+% and the first line trigger, i.e. the time it takes to complete a scan
+% line. 
 %
 % Moreover, having worked out the duration of the scanline, we can
 % calculate back from the line marker such that we can easily get rid of
@@ -333,36 +326,32 @@ NoOfOverflows = 0;
 Overflows = bitand(Channel,2048) ~= 0;
 
 % AbsoluteTimeTag can be calculated in a vectorized fashion.
-AbsoluteTimeTag = uint32([0 ; cumsum(Overflows(1:end-1).*65536)]) + TimeTag;
+% If Overflows is:
+% [ 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0 0 ]
+% cumsum will yield:
+% [ 0 0 1 1 1 1 1 2 2 2 2 2 3 3 3 3 4 4 4 ]
+% We need to shift this by one position to the right since the overflow
+% only needs to be applied starting from the record following its
+% occurence:
+% [ P P O P P P P O P P P P O P P P O P P ] (P = photon, O = overflow).
+% The shift:
+% [ 0 0 0 1 1 1 1 1 2 2 2 2 2 3 3 3 3 4 4 4 ]
+% We then only need to multiply by 65536.
+AbsoluteTimeTag = ...
+    uint32([0 ; cumsum(Overflows(1:end-1).*65536)]) + TimeTag;
 
 % Get the count of overflows as NoOfOverflows
 NoOfOverflows = sum(Overflows);
-
-% FOR EDUCATIONAL PURPOSES. The above three vectorized lines could be
-% expressed as a loop but this loop is an order of magnitude slower!
-% for i=1:NumberOfRecords
-%     
-%     %Running through all records, if we meet anything other than an
-%     %overflow record, we van just calculate its absolute time based on
-%     %current overflow count and its timetag.
-%     AbsoluteTimeTag(i) = NoOfOverflows * 65536 + TimeTag(i);
-%     
-%     % We are running through all records so if we encounter an overflow
-%     % (signified by bitand(..., 2048), we add 1 to the overflow count.
-%     if bitand(Channel(i),2048)
-%         NoOfOverflows = NoOfOverflows + 1;
-%     end;
-% end;
 
 % We get the specific indices of the FIRST (hence the find (..., 1) frame- 
 % and line markers. These are the INVALID (no photons!) records of type 
 % marker with values 4 and 2 respectively. 
 LineEnd = find(~Valid & bitand(Channel,7) == 4, 1);
-LineStart = find(~Valid & bitand(Channel,7) == 2, 1);
+FrameStart = find(~Valid & bitand(Channel,7) == 2, 1);
 
 % We therefore need to look up the corresponding index in "AbsoluteTimeTag" 
 % because we are interested in absolute time. 
-LineDuration = AbsoluteTimeTag(LineEnd) - AbsoluteTimeTag(LineStart);
+LineDuration = AbsoluteTimeTag(LineEnd) - AbsoluteTimeTag(FrameStart);
 
 % The duration of a pixel.
 PixelDuration = round(LineDuration / pixels);
@@ -375,6 +364,10 @@ if gmin >= gmax
     PixelChannelCorrected_s = gmin;
     gmin = gmax;
     gmax = PixelChannelCorrected_s;
+else
+    if gmin == gmax
+        gmax = gmin + 0.1;
+    end  
 end
 
 % In reality, not all reverse start-stop time bins of the TCSPC will be 
@@ -402,10 +395,6 @@ MaximumReverseStartStop_ns =  MaximumBin * Board_Resolution;
 % Hz, so we need to take into account proper conversions of time (s vs ns).
 ChannelCorrected_s = double(Channel);
 
-% FOR EDUCATIONAL PURPOSES: we use the vectorization approach to calculate
-% the actual corrected s-s times for all records instead of the loop
-% directly below. Matlab is bad at loops and avoiding it hear results in an
-% improvement of the executions speed of at least 1 order of magnitude.
 RevStartStopTime_s = double(Channel) * Board_Resolution * 1.0E-09;
 
 ChannelCorrected_s(RevStartStopTime_s > 1.0 / SYNCRate) = ...
@@ -414,16 +403,7 @@ ChannelCorrected_s(RevStartStopTime_s > 1.0 / SYNCRate) = ...
 ChannelCorrected_s(RevStartStopTime_s <= 1.0 / SYNCRate) = ...
     1.0 / SYNCRate - RevStartStopTime_s(RevStartStopTime_s <= 1.0 / SYNCRate);
 
-% for i=1:1:NumberOfRecords
-%     RevStartStopTime_s = double(Channel(i)) * Board_Resolution * 1.0E-09;
-%     if RevStartStopTime_s > 1.0 / SYNCRate
-%         ChannelCorrected_s(i) = 2.0 / SYNCRate - RevStartStopTime_s;
-%     else
-%         ChannelCorrected_s(i) = 1.0 / SYNCRate - RevStartStopTime_s;
-%     end
-% end;
-
-% alculate the real start stop time range for reporting.
+% Calculate the real start stop time range for reporting.
 MinimumStartStop_ns =  double(min(ChannelCorrected_s(Valid))) * 1.0E9;
 MaximumStartStop_ns =  double(max(ChannelCorrected_s(Valid))) * 1.0E9;
 
@@ -443,79 +423,70 @@ GatingLogical = ...
 %
 % The very first line starts at frame marker and runs to the first line
 % marker.
-CurrentLineStart = LineStart;
+CurrentLineStart = FrameStart;
 
 % Pre-allocate the image data store, including start stop times. 
 %
-% Simple image data will be in a 2D array of size pixels * pixels. The 
-% individual start stop times will be placed in a cell array. The layout of 
-% which is explained below.
+% Simple image data will be in a 2D array of size pixels * pixels. The
+% vectors holding individual start stop times per pixel will be placed in a 
+% cell array. The layout of which is explained below.
 ImageData = { zeros(pixels,pixels) , cell(pixels, pixels) };
 
 % For correct pixel parsing, we create an array of pixel indices which is
 % front to back.
-PixelIndices = uint32(flipud([ 1:pixels ]'));
+PixelIndices = uint32(flipud( [ 1:pixels ]'));
 
 % Cycle through the lines.
 for i=1:pixels
     
     CurrentLineEnd = LineMarkerIndices(i);
     
-    % The records that are on the current line.
+    % The records that are on the current line. Limiting operations to
+    % these records might speed up operations.
     LineData = AbsoluteTimeTag(CurrentLineStart:CurrentLineEnd);
     LineValid = Valid(CurrentLineStart:CurrentLineEnd);
     LineGatingLogical = GatingLogical(CurrentLineStart:CurrentLineEnd);
     LineChannelCorrected_s = ChannelCorrected_s(CurrentLineStart:CurrentLineEnd);
     
-    % The pixel generation is basically the same as constructing a
-    % histogram with edges on the pixel end timepoints.
+    % Pixel generation is basically the same as constructing a histogram 
+    % with edges on the pixel end timepoints.
+    
+    % First we calculate all pixel end time tags which are the time tags of
+    % the line marker minus a multiple of the pixel duration. We are
+    % processing back from the end of line pixel, that is why PixelIndices
+    % is reversed.
+    % Values range from linemarker - 399 * PixelDuration to 
+    %                   linemarker - 000 * PixelDuration
     PixelEnd = ...
         AbsoluteTimeTag(LineMarkerIndices(i)) - (PixelIndices - 1) * PixelDuration;
     
-    % The histogram itself.
-    [PixelIntensity, PixelIndex ] = histc(LineData(LineValid), PixelEnd);
+    % We now bin the photonrecords that fall within the gating boundaries 
+    % by these pixel end times.
+    ImageData{1,1}(i, :, 1) = histc(LineData(LineGatingLogical & LineValid), PixelEnd);
     
-    % Get the lifetimes grouped per pixel.
-    PixelLifeTimes = accumarray(uint32(PixelIndex + 1),LineChannelCorrected_s(LineValid), [], @(x) {x});
+    % We next want to group start stop times per pixel. So here, we do not
+    % need gating. We will also use the bin numbers instead of their
+    % contents. Indeed, PixelIndex holds the pixel number of each valid
+    % record in the current line.
+    [ ~ , PixelIndex ] = histc(LineData(LineValid), PixelEnd);
+    
+    % The PixelIndex (bins) are 0 based, so we add one for later array
+    % indexing.
+    PixelIndex = uint32(PixelIndex + 1);
+    
+    % We will now aggregate the valid channel values by the pixel to which
+    % they belong in a cell array. If a certain bin index is not present,
+    % an empty cell will be inserted, unless we are at the end, then
+    % nothing will be added.
+    PixelLifeTimes = accumarray(PixelIndex, LineChannelCorrected_s(LineValid), [], @(x) {x});
+    
+    % This is line data so make a row cell array.
     PixelLifeTimes = PixelLifeTimes';
-    blah = length(PixelLifeTimes);
-    kak = histc(LineData(LineGatingLogical), PixelEnd);
-    kaklength = length(kak);
-    % Store the image
-    ImageData{1,1}(i, :, 1) = histc(LineData(LineGatingLogical), PixelEnd);
     
     % Store the lifetimes.
-    ImageData{1,2}(i,1:blah) = PixelLifeTimes;
-   
-%     
-%     LineChannelCorrected_s(LineValid)
-%     
-%     PixelChannelCorrected_s = LineChannelCorrected_s(LineData < pend & LineData > pstart & LineValid);
-%     noOfElements = length(PixelChannelCorrected_s);
-%         
-%     ImageData(i, pixels - j + 1, 2:noOfElements + 1) = PixelChannelCorrected_s;
+    ImageData{1,2}(i,1:length(PixelLifeTimes)) = PixelLifeTimes;
     
-%     %Cycle through the pixels in each line.
-%     for j=1:1:pixels
-%         The end time of pixel.
-%         pend = AbsoluteTimeTag(LineMarkerIndices(i)) - ...
-%             (PixelDuration * (j - 1));
-%         
-%         The start time of pixel.
-%         pstart = AbsoluteTimeTag(LineMarkerIndices(i)) - ...
-%             (PixelDuration * j);
-% 
-%         ImageData(i, j, 1) = length(LineData(LineData < PixelEnd & LineData > PixelStart & LineGatingLogical));
-%         
-%         ImageData(i, pixels - j + 1, 1) = length(LineData(LineData < pend & LineData > pstart & LineGatingLogical));
-% 
-%         PixelChannelCorrected_s = LineChannelCorrected_s(LineData < pend & LineData > pstart & LineValid);
-%         noOfElements = length(PixelChannelCorrected_s);
-%         
-%         ImageData(i, pixels - j + 1, 2:noOfElements + 1) = PixelChannelCorrected_s;
-%         
-%     end
-    
+    % Proceed to the next line marker.
     CurrentLineStart = LineMarkerIndices(i);
     
 end
