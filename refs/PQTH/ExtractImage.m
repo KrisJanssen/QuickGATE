@@ -354,7 +354,7 @@ NoOfOverflows = sum(Overflows);
 %     end;
 % end;
 
-% We get the specific indices of the FIRST (hense the find (..., 1) frame- 
+% We get the specific indices of the FIRST (hence the find (..., 1) frame- 
 % and line markers. These are the INVALID (no photons!) records of type 
 % marker with values 4 and 2 respectively. 
 LineEnd = find(~Valid & bitand(Channel,7) == 4, 1);
@@ -384,6 +384,9 @@ end
 % Or at the very least report them to the user.
 MinimumBin = double(min(Channel(Valid)));
 MaximumBin = double(max(Channel(Valid)));
+
+% Correct Channel
+Channel = Channel - uint32(MinimumBin);
 
 % alculate the real start stop time range for reporting.
 MinimumReverseStartStop_ns =  MinimumBin * Board_Resolution;
@@ -442,14 +445,16 @@ GatingLogical = ...
 % marker.
 CurrentLineStart = LineStart;
 
-% Pre-allocate the image data store, including start stop times. As such,
-% ImageData(:,:,1) will hold the image itself and (:,:,2:501) will hold all
-% individual start stop times, grouped per pixel.
-%                                                                             
-% Please note that the current solution assumes there will be no more than
-% 500 start stop times per pixel so this imposes a limitation on the
-% maximum count rate you can have.
-ImageData = zeros(pixels,pixels, 501);
+% Pre-allocate the image data store, including start stop times. 
+%
+% Simple image data will be in a 2D array of size pixels * pixels. The 
+% individual start stop times will be placed in a cell array. The layout of 
+% which is explained below.
+ImageData = { zeros(pixels,pixels) , cell(pixels, pixels) };
+
+% For correct pixel parsing, we create an array of pixel indices which is
+% front to back.
+PixelIndices = uint32(flipud([ 1:pixels ]'));
 
 % Cycle through the lines.
 for i=1:pixels
@@ -462,23 +467,54 @@ for i=1:pixels
     LineGatingLogical = GatingLogical(CurrentLineStart:CurrentLineEnd);
     LineChannelCorrected_s = ChannelCorrected_s(CurrentLineStart:CurrentLineEnd);
     
-    %Cycle through the pixels in each line.
-    for j=1:1:pixels
-        % The end time of pixel.
-        pend = AbsoluteTimeTag(LineMarkerIndices(i)) - ...
-            (PixelDuration * (j - 1));
-        
-        % The start time of pixel.
-        pstart = AbsoluteTimeTag(LineMarkerIndices(i)) - ...
-            (PixelDuration * j);
-
-        ImageData(i, pixels - j + 1, 1) = length(LineData(LineData < pend & LineData > pstart & LineGatingLogical));
-
-        PixelChannelCorrected_s = LineChannelCorrected_s(LineData < pend & LineData > pstart & LineValid);
-        noOfElements = length(PixelChannelCorrected_s);
-        ImageData(i, pixels - j + 1, 2:noOfElements + 1) = PixelChannelCorrected_s;
-        
-    end
+    % The pixel generation is basically the same as constructing a
+    % histogram with edges on the pixel end timepoints.
+    PixelEnd = ...
+        AbsoluteTimeTag(LineMarkerIndices(i)) - (PixelIndices - 1) * PixelDuration;
+    
+    % The histogram itself.
+    [PixelIntensity, PixelIndex ] = histc(LineData(LineValid), PixelEnd);
+    
+    % Get the lifetimes grouped per pixel.
+    PixelLifeTimes = accumarray(uint32(PixelIndex + 1),LineChannelCorrected_s(LineValid), [], @(x) {x});
+    PixelLifeTimes = PixelLifeTimes';
+    blah = length(PixelLifeTimes);
+    kak = histc(LineData(LineGatingLogical), PixelEnd);
+    kaklength = length(kak);
+    % Store the image
+    ImageData{1,1}(i, :, 1) = histc(LineData(LineGatingLogical), PixelEnd);
+    
+    % Store the lifetimes.
+    ImageData{1,2}(i,1:blah) = PixelLifeTimes;
+   
+%     
+%     LineChannelCorrected_s(LineValid)
+%     
+%     PixelChannelCorrected_s = LineChannelCorrected_s(LineData < pend & LineData > pstart & LineValid);
+%     noOfElements = length(PixelChannelCorrected_s);
+%         
+%     ImageData(i, pixels - j + 1, 2:noOfElements + 1) = PixelChannelCorrected_s;
+    
+%     %Cycle through the pixels in each line.
+%     for j=1:1:pixels
+%         The end time of pixel.
+%         pend = AbsoluteTimeTag(LineMarkerIndices(i)) - ...
+%             (PixelDuration * (j - 1));
+%         
+%         The start time of pixel.
+%         pstart = AbsoluteTimeTag(LineMarkerIndices(i)) - ...
+%             (PixelDuration * j);
+% 
+%         ImageData(i, j, 1) = length(LineData(LineData < PixelEnd & LineData > PixelStart & LineGatingLogical));
+%         
+%         ImageData(i, pixels - j + 1, 1) = length(LineData(LineData < pend & LineData > pstart & LineGatingLogical));
+% 
+%         PixelChannelCorrected_s = LineChannelCorrected_s(LineData < pend & LineData > pstart & LineValid);
+%         noOfElements = length(PixelChannelCorrected_s);
+%         
+%         ImageData(i, pixels - j + 1, 2:noOfElements + 1) = PixelChannelCorrected_s;
+%         
+%     end
     
     CurrentLineStart = LineMarkerIndices(i);
     

@@ -285,22 +285,29 @@ end
 % Y, width, height.
 pos = int32(round(getPosition(h)));
 
-% The start-stop data is in the output of the render operation as a 3D
-% matrix of dimensions : (pixelsX, pixelsY, 501) with the actual image data
-% in (pixelsX, pixelsY, 1) and all start stop times in (:,:,2:501). We will
-% now put the start-stop times for the ROI only in a linear array.
-buffersize = pos(1,3) * pos(1,4) * 500;
+x1 = pos(1,1);
+x2 = pos(1,3) + x1 - 1;
 
-startstops = zeros(buffersize, 1);
+y1 = pos(1,2);
+y2 = pos(1,4) + y1 - 1;
 
-for i=pos(1,2):pos(1,2) + pos(1,4) - 1
-   for j=pos(1,1):pos(1,1) + pos(1,3) - 1
-       startstops((((i * j) - 1) * 500) + 1:(i * j * 500)) = handles.rawdata(i,j,2:end);
-   end
-end
+% vertcat
+%startstop_ns = vertcat(handles.rawdata{1,2}{pos(1,2):(pos(1,4) - 1),1}{pos(1,1):pos(1,1) + pos(1,3) - 1,1}) * 1E9;
+
+subset = handles.rawdata{1,2}(y1:y2,x1:x2);
+
+
+startstop_ns = vertcat(subset{:,:})  * 1E9;
+
+% for i=pos(1,2):pos(1,2) + pos(1,4) - 1
+%    for j=pos(1,1):pos(1,1) + pos(1,3) - 1
+%        temp = handles.rawdata{1,2}{j,1}{i,1};
+%        
+%    end
+% end
 
 % Only keep non-zero values and express them in ns.
-startstop_ns = startstops(find(startstops)) * 1E9;
+%startstop_ns = startstops(find(startstops)) * 1E9;
 
 % Store the handle to the just-defined ROI.
 handles.rect = h;
@@ -387,7 +394,7 @@ end
     ExtractImage(strcat(handles.path, handles.file), gmin, gmax);
 
 updateUI(hObject, ...
-    ImageData(:,:,1), ...
+    ImageData{1,1}(:,:), ...
     gmin, ...
     gmax, ...
     messages, ...
