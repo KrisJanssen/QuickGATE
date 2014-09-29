@@ -22,7 +22,7 @@ function varargout = QuickGATE(varargin)
 
 % Edit the above text to modify the response to help QuickGATE
 
-% Last Modified by GUIDE v2.5 23-Sep-2014 18:19:42
+% Last Modified by GUIDE v2.5 29-Sep-2014 10:39:39
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -64,10 +64,12 @@ guidata(hObject, handles);
 % uiwait(handles.figure1);
 
 % Add path to external helper references.
-addpath('refs');
-addpath('refs/PQTH');
-addpath('refs/uipos');
-addpath('Utility');
+
+addpath_recurse('refs');
+% addpath('refs');
+% addpath('refs/PQTH');
+% addpath('refs/uipos');
+% addpath('Utility');
 
 % --- Outputs from this function are returned to the command line.
 function varargout = QuickGATE_OutputFcn(hObject, eventdata, handles) 
@@ -291,23 +293,9 @@ x2 = pos(1,3) + x1 - 1;
 y1 = pos(1,2);
 y2 = pos(1,4) + y1 - 1;
 
-% vertcat
-%startstop_ns = vertcat(handles.rawdata{1,2}{pos(1,2):(pos(1,4) - 1),1}{pos(1,1):pos(1,1) + pos(1,3) - 1,1}) * 1E9;
-
 subset = handles.rawdata{1,2}(y1:y2,x1:x2);
 
-
 startstop_ns = vertcat(subset{:,:})  * 1E9;
-
-% for i=pos(1,2):pos(1,2) + pos(1,4) - 1
-%    for j=pos(1,1):pos(1,1) + pos(1,3) - 1
-%        temp = handles.rawdata{1,2}{j,1}{i,1};
-%        
-%    end
-% end
-
-% Only keep non-zero values and express them in ns.
-%startstop_ns = startstops(find(startstops)) * 1E9;
 
 % Store the handle to the just-defined ROI.
 handles.rect = h;
@@ -406,3 +394,100 @@ guidata(hObject, handles);
 
 %profile off
 %profile viewer
+
+
+% --- Executes on button press in btnCrossSection.
+function btnCrossSection_Callback(hObject, eventdata, handles)
+% hObject    handle to btnCrossSection (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+noOfSections= str2double(get(handles.txtSections, 'string'));
+
+% Operate on the left axes.
+axes(handles.axesLeft);
+
+% Let the user define a line on the image.
+h = imline;
+
+% Wait until the line is positioned correctly.
+position = LinePoints2Row(wait(h));
+
+% Generate two parallel lines.
+LineRight = parallelLine(position, 20);
+LineLeft = parallelLine(position, -20);
+
+% Generate the right line.
+hr = imline(handles.axesLeft, Row2LinePoints(LineRight));
+
+% Get the length and position of this line.
+% TODO: clean up.
+api = iptgetapi(hr);
+linePosition = api.getPosition();
+length = [ 0; edgeLength([ linePosition(1,:) linePosition(2,:) ])];
+dist_steps = linspace(0, length(end), noOfSections);
+pointsRight = interp1(length,linePosition,dist_steps);
+
+hl = imline(handles.axesLeft, Row2LinePoints(LineLeft));
+
+% Get the length and position of this line.
+% TODO: clean up.
+api = iptgetapi(hl);
+linePosition = api.getPosition();
+length = [ 0; edgeLength([ linePosition(1,:) linePosition(2,:) ])];
+dist_steps = linspace(0, length(end), noOfSections);
+pointsLeft = interp1(length,linePosition,dist_steps);
+
+% We now have start and end points for the improfile function.
+sectionStartPoints = [ pointsLeft(:,1) pointsRight(:,1) ];
+sectionEndPoints = [ pointsLeft(:,2) pointsRight(:,2) ];
+
+% We get the image from which we need to get sections.
+iml = getimage(handles.axesLeft);
+normiml = (iml-min(iml(:))) ./ (max(iml(:)-min(iml(:))));
+imr = getimage(handles.axesRight);
+normimr = (imr-min(imr(:))) ./ (max(imr(:)-min(imr(:))));
+
+% Some tricks to apply improfile more than once.
+I=1:size(sectionStartPoints,1);
+Fl=@(i,j) improfile(normiml,sectionStartPoints(i,:) ,sectionEndPoints(i,:));
+Fr=@(i,j) improfile(normimr,sectionStartPoints(i,:) ,sectionEndPoints(i,:));
+
+sectionsl = arrayfun(Fl,I,I,'UniformOutput', false); 
+sectionsr = arrayfun(Fr,I,I,'UniformOutput', false); 
+
+sectionsArrayl = cell2mat(sectionsl);
+sectionsArrayr = cell2mat(sectionsr);
+
+
+avl = mean(sectionsArrayl, 2);
+avr = mean(sectionsArrayr, 2);
+
+figure
+hold on
+plot(avl,'-or');
+plot(avr,'-xb');
+plot 
+
+
+
+function txtSections_Callback(hObject, eventdata, handles)
+% hObject    handle to txtSections (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of txtSections as text
+%        str2double(get(hObject,'String')) returns contents of txtSections as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function txtSections_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to txtSections (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
