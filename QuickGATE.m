@@ -457,23 +457,29 @@ Fr=@(i,j) improfile(normimr,sectionStartPoints(i,:) ,sectionEndPoints(i,:));
 sectionsl = arrayfun(Fl,I,I,'UniformOutput', false); 
 sectionsr = arrayfun(Fr,I,I,'UniformOutput', false); 
 
+% The sections. We also dump them to console...
 sectionsArrayl = cell2mat(sectionsl);
 sectionsArrayr = cell2mat(sectionsr);
 
 
 avl = mean(sectionsArrayl, 2);
+normavl = (avl-min(avl(:))) ./ (max(avl(:)-min(avl(:))));
 avr = mean(sectionsArrayr, 2);
+normavr = (avr-min(avr(:))) ./ (max(avr(:)-min(avr(:))));
 
 x = 1:size(avl,1);
-f = fit(x',avl,'gauss2')
+f = fit(x',normavl,'gauss2')
 
 
 figure
 hold on
-plot(avl,'-or');
-plot(avr,'-xb');
+plot(normavl,'-or');
+plot(normavr,'-xb');
 plot(f,'-.g');
+hold off
 
+sectionsArrayl = sectionsArrayl'
+sectionsArrayr = sectionsArrayr'
 
 
 function txtSections_Callback(hObject, eventdata, handles)
