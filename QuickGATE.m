@@ -464,7 +464,7 @@ avl = mean(sectionsArrayl, 2);
 avr = mean(sectionsArrayr, 2);
 
 x = 1:size(avl,1);
-f = fit(x',avl,'gauss2');
+f = fit(x',avl,'gauss2')
 
 
 figure
