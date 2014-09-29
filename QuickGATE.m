@@ -467,7 +467,6 @@ figure
 hold on
 plot(avl,'-or');
 plot(avr,'-xb');
-plot 
 
 
 
