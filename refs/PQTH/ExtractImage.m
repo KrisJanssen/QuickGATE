@@ -397,11 +397,21 @@ ChannelCorrected_s = double(Channel);
 
 RevStartStopTime_s = double(Channel) * Board_Resolution * 1.0E-09;
 
-ChannelCorrected_s(RevStartStopTime_s > 1.0 / SYNCRate) = ...
-    2.0 / SYNCRate - RevStartStopTime_s(RevStartStopTime_s > 1.0 / SYNCRate);
+% For debug purposes.
+figure
+hist(double(Channel(Valid)),4096);
+title('Raw channel data histogram (Reverse start-stop)')
+
+ChannelCorrected_s(RevStartStopTime_s >= 1.0 / SYNCRate) = ...
+    2.0 / SYNCRate - RevStartStopTime_s(RevStartStopTime_s >= 1.0 / SYNCRate);
 
 ChannelCorrected_s(RevStartStopTime_s <= 1.0 / SYNCRate) = ...
     1.0 / SYNCRate - RevStartStopTime_s(RevStartStopTime_s <= 1.0 / SYNCRate);
+
+% For debug purposes.
+figure
+hist(double(ChannelCorrected_s(Valid)) * 1E9,4096);
+title('Corrected channel data histogram (ns)')
 
 % Calculate the real start stop time range for reporting.
 MinimumStartStop_ns =  double(min(ChannelCorrected_s(Valid))) * 1.0E9;
