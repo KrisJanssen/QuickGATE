@@ -22,7 +22,7 @@ function varargout = QuickGATE(varargin)
 
 % Edit the above text to modify the response to help QuickGATE
 
-% Last Modified by GUIDE v2.5 29-Sep-2014 14:29:13
+% Last Modified by GUIDE v2.5 30-Sep-2014 14:17:27
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -66,10 +66,7 @@ guidata(hObject, handles);
 % Add path to external helper references.
 
 addpath_recurse('refs');
-% addpath('refs');
-% addpath('refs/PQTH');
-% addpath('refs/uipos');
-% addpath('Utility');
+addpath_recurse('core');
 
 % --- Outputs from this function are returned to the command line.
 function varargout = QuickGATE_OutputFcn(hObject, eventdata, handles) 
@@ -293,17 +290,12 @@ x2 = pos(1,3) + x1 - 1;
 y1 = pos(1,2);
 y2 = pos(1,4) + y1 - 1;
 
-subset = handles.rawdata{1,2}(y1:y2,x1:x2);
-
-startstop_ns = vertcat(subset{:,:})  * 1E9;
-
 % Store the handle to the just-defined ROI.
 handles.rect = h;
 guidata(hObject, handles);
 
-% Plot the histogram.
-figure;
-hist(startstop_ns,100);
+
+lifetimeHist(handles.rawdata{1,2}(y1:y2,x1:x2),100);
 
 function txtOutput_Callback(hObject, eventdata, handles)
 % hObject    handle to txtOutput (see GCBO)
@@ -324,76 +316,6 @@ function txtOutput_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-
-function updateUI(hObject, imdata, gmin, gmax, output, updateaxes)
-
-% Get all handles.
-handles = guidata(hObject);
-
-switch updateaxes
-    case 'left'
-        axes(handles.axesLeft);
-        imagesc(imdata); 
-        colormap(hot);
-        set(handles.lowGateLeft, 'string', sprintf('%5.2f', gmin));
-        set(handles.highGateLeft, 'string', sprintf('%5.2f', gmax));
- gmax = str2double(get(handles.highGateLeft, 'string'));
-    case 'right'
-        axes(handles.axesRight);
-        imagesc(imdata);
-        colormap(hot);
-        set(handles.lowGateRight, 'string', sprintf('%5.2f', gmin));
-        set(handles.highGateRight, 'string', sprintf('%5.2f', gmax));
-    otherwise
-        axes(handles.axesLeft);
-        imagesc(imdata); 
-        colormap(hot);
-        set(handles.lowGateLeft, 'string', sprintf('%5.2f', gmin));
-        set(handles.highGateLeft, 'string', sprintf('%5.2f', gmax));
-        
-        axes(handles.axesRight);
-        imagesc(imdata);
-        colormap(hot);
-        set(handles.lowGateRight, 'string', sprintf('%5.2f', gmin));
-        set(handles.highGateRight, 'string', sprintf('%5.2f', gmax));
-end
-
-% Show output to the user.
-set(handles.txtOutput, 'string', output);
-
-function [ gmin, gmax ] = render(hObject, updateaxes)
-%profile('on', '-detail', 'builtin')
-% Get all handles.
-handles = guidata(hObject);
-
-switch updateaxes
-    case 'left'
-        gmin = str2double(get(handles.lowGateLeft, 'string'));
-        gmax = str2double(get(handles.highGateLeft, 'string'));
-    case 'right'
-        gmin = str2double(get(handles.lowGateRight, 'string'));
-        gmax = str2double(get(handles.highGateRight, 'string'));
-    otherwise
-        gmin = 0;
-        gmax = 100;
-end
-
-[ ImageData, gmin, gmax, messages ] = ...
-    ExtractImage(strcat(handles.path, handles.file), gmin, gmax);
-
-updateUI(hObject, ...
-    ImageData{1,1}(:,:), ...
-    gmin, ...
-    gmax, ...
-    messages, ...
-    updateaxes);
-
-handles.rawdata = ImageData;
-
-guidata(hObject, handles);
-
-%profile off
-%profile viewer
 
 
 % --- Executes on button press in btnCrossSection.
@@ -525,3 +447,45 @@ function txtSectionWidth_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
+
+
+% --- Executes on button press in btnSCross.
+function btnSCross_Callback(hObject, eventdata, handles)
+% hObject    handle to btnSCross (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% We get the image from which we need to get sections.
+iml = getimage(handles.axesLeft);
+normiml = (iml-min(iml(:))) ./ (max(iml(:)-min(iml(:))));
+
+imr = getimage(handles.axesRight);
+normimr = (imr-min(imr(:))) ./ (max(imr(:)-min(imr(:))));
+
+% Operate on the left axes.
+axes(handles.axesLeft);
+[ ~, ~, sectionl, x, y ] = improfile;
+
+sectionr = improfile(normimr,x,y);
+normsectionl = (sectionl-min(sectionl(:))) ./ (max(sectionl(:)-min(sectionl(:))));
+normsectionr = (sectionr-min(sectionr(:))) ./ (max(sectionr(:)-min(sectionr(:))));
+
+x = 1:size(normsectionl,1);
+f = fit(x',normsectionl,'gauss2');
+
+
+figure
+hold on
+plot(normsectionl,'-xb');
+plot(normsectionr,'--r');
+plot(f,'-.g');
+hold off
+
+
+% --- Executes on button press in btnLifeTime.
+function btnLifeTime_Callback(hObject, eventdata, handles)
+% hObject    handle to btnLifeTime (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+lifetimeHist(handles.rawdata{1,2}(1:end,1:end), 100);
