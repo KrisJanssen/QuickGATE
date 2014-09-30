@@ -295,7 +295,7 @@ handles.rect = h;
 guidata(hObject, handles);
 
 
-lifetimeHist(handles.rawdata{1,2}(y1:y2,x1:x2),100);
+lifetimeHist(handles.rawdata{1,2}(y1:y2,x1:x2),4096,25);
 
 function txtOutput_Callback(hObject, eventdata, handles)
 % hObject    handle to txtOutput (see GCBO)
@@ -488,4 +488,4 @@ function btnLifeTime_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-lifetimeHist(handles.rawdata{1,2}(1:end,1:end), 100);
+lifetimeHist(handles.rawdata{1,2}(1:end,1:end), 4096, 25);
