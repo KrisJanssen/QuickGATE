@@ -33,7 +33,9 @@ fitDouble = fit(edges(fitStart:fitEnd)',histData(fitStart:fitEnd)','exp2')
 % Generate a figure.
 figure;
 % Plot the histogram.
-plot(edges,histData,'--b');
+% plot(edges,histData,'--b');
+% x = edges';
+% y = histData';
 hold on
 % Plot both fits.
 plot(edges(fitStart:fitEnd),feval(fitSingle,edges(fitStart:fitEnd)),'-xr','LineWidth',2);

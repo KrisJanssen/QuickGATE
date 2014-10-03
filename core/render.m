@@ -15,7 +15,7 @@ switch updateaxes
         gmax = 100;
 end
 
-[ ImageData, gmin, gmax, messages ] = ...
+[ ImageData, gmin, gmax, SYNCrate, messages ] = ...
     ExtractImage(strcat(handles.path, handles.file), gmin, gmax);
 
 updateUI(hObject, ...
@@ -26,5 +26,7 @@ updateUI(hObject, ...
     updateaxes);
 
 handles.rawdata = ImageData;
+
+handles.SYNCrate = SYNCrate;
 
 guidata(hObject, handles);

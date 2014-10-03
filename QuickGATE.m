@@ -84,9 +84,15 @@ function btnExport_Callback(hObject, eventdata, handles)
 % hObject    handle to btnExport (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-axes(handles.axesRight);
-img  = getframe(gca);
-imwrite(img.cdata,['MyImage_'  datestr(clock,'ddmmyyyyHHMMSSAM') '.png'],'png')
+iml = getimage(handles.axesLeft);
+imr = getimage(handles.axesRight);
+normiml = (iml-min(iml(:))) ./ (max(iml(:)-min(iml(:))));
+normimr = (imr-min(imr(:))) ./ (max(imr(:)-min(imr(:))));
+
+%cm = colormap(hot(256));
+imwrite(normiml,['L_' get(handles.lowGateLeft, 'string') '_' get(handles.highGateLeft, 'string') '_' handles.fileName '.png'],'png')
+imwrite(normimr,['R_' get(handles.lowGateLeft, 'string') '_' get(handles.highGateLeft, 'string') '_' handles.fileName '.png'],'png')
+
 
 % --- Executes on button press in btnGateOne.
 function btnGateOne_Callback(hObject, eventdata, handles)
@@ -295,7 +301,7 @@ handles.rect = h;
 guidata(hObject, handles);
 
 
-lifetimeHist(handles.rawdata{1,2}(y1:y2,x1:x2),4096,25);
+lifetimeHist(handles.rawdata{1,2}(y1:y2,x1:x2), 4096, 1E9 / handles.SYNCrate);
 
 function txtOutput_Callback(hObject, eventdata, handles)
 % hObject    handle to txtOutput (see GCBO)
@@ -488,4 +494,4 @@ function btnLifeTime_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-lifetimeHist(handles.rawdata{1,2}(1:end,1:end), 4096, 25);
+lifetimeHist(handles.rawdata{1,2}(1:end,1:end), 4096, 1E9 / handles.SYNCrate);
