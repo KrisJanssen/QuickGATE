@@ -15,8 +15,15 @@ switch updateaxes
         gmax = 100;
 end
 
-[ ImageData, gmin, gmax, SYNCrate, messages ] = ...
-    ExtractImage(strcat(handles.path, handles.file), gmin, gmax);
+[~,~,ext] = fileparts(filename);
+
+switch ext
+    case '.dat'
+        
+    case '.t3r'
+        [ ImageData, gmin, gmax, SYNCrate, messages ] = ...
+            ExtractImageT3R(strcat(handles.path, handles.file), gmin, gmax);      
+end
 
 updateUI(hObject, ...
     ImageData{1,1}(:,:), ...

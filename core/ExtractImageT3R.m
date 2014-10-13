@@ -1,4 +1,4 @@
-function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractImage( filepath, gmin, gmax )
+function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractImageT3R( filepath, gmin, gmax )
 %EXTRACTIMAGE allows images to be extracted from PQ .t3r files.
 %   Parameters:
 %   
