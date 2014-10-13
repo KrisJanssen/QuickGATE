@@ -22,7 +22,7 @@ function varargout = QuickGATE(varargin)
 
 % Edit the above text to modify the response to help QuickGATE
 
-% Last Modified by GUIDE v2.5 30-Sep-2014 14:17:27
+% Last Modified by GUIDE v2.5 13-Oct-2014 15:14:55
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -207,7 +207,7 @@ function uipushopen_ClickedCallback(hObject, eventdata, handles)
 % hObject    handle to uipushopen (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-[file, path] = uigetfile('*.t3r','*.dat','Select the file');
+[file, path] = uigetfile('*.t3r','Select a file');
 
 if path == 0
     return
@@ -495,3 +495,18 @@ function btnLifeTime_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 lifetimeHist(handles.rawdata{1,2}(1:end,1:end), 4096, 1E9 / handles.SYNCrate);
+
+
+% --- Executes on button press in btnConfocal.
+function btnConfocal_Callback(hObject, eventdata, handles)
+% hObject    handle to btnConfocal (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+data = ExtractImageDAT(1); 
+
+axes(handles.axesRight);
+ imagesc(data);
+
+% Save variables for access by other callbacks.
+guidata(hObject, handles);

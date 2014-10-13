@@ -1,4 +1,4 @@
-function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractImageDAT( filepath, channel )
+function [ ImageData ] = ExtractImageDAT( channel )
 %EXTRACTIMAGE allows images to be extracted from PQ .t3r files.
 %   Parameters:
 %   
@@ -16,7 +16,12 @@ function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractImageDAT( filepa
 
 %% The actual rendering
 
+[filename, pathname] = uigetfile('*.dat','Select Image Data file! (.dat)')
+filepath = [pathname filename];
+
 fid=fopen(filepath);
+
+T=fread(fid,'int32');
 
 fseek(fid, 98, 'bof');
 ScanAxes = fread(fid,1,'uint16')
@@ -52,10 +57,12 @@ if channel == 1
 elseif channel == 2
     z = reshape(T_data2,d,d)';
 end
-    
-out.im1 = z;
-out.pathname = fullpath_filename;
-out.name = filename;
+
+%ImageData = { zeros(d,d) , cell(d, d) };
+
+%ImageData{1,1}(:,:) = z;
+
+ImageData = z;
 
 % messages = strcat(...
 %     sprintf('\nStatistics:\n'),...
