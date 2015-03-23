@@ -11,17 +11,20 @@ edges = linspace(syncperiod / bins,syncperiod,bins);
 % Plot the histogram.
 histData = histc(startstop_ns,edges)';
 
+histNORM = histData.' /norm(histData.') ;
+edgesTransp = edges.' ;
+
 nonz = find(histData);
 
 histData = histData(nonz);
 edges = edges(nonz);
+histNORM = histData.' ./ max(max(histData.', 1)) ;
+edgesTransp = edges.' ;
 
 % We only want to fit the decay part of the curve.
 
 fitEnd = round(length(edges) * 0.9);
 fitStart = find(histData == max(histData(1:fitEnd)), 1);
-
-
 
 % Fit exp1 and exp2.
 fitSingle = fit(edges(fitStart:fitEnd)',histData(fitStart:fitEnd)','exp1')
