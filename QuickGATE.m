@@ -22,7 +22,7 @@ function varargout = QuickGATE(varargin)
 
 % Edit the above text to modify the response to help QuickGATE
 
-% Last Modified by GUIDE v2.5 13-Oct-2014 15:14:55
+% Last Modified by GUIDE v2.5 23-Mar-2015 10:39:27
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -510,3 +510,30 @@ axes(handles.axesRight);
 
 % Save variables for access by other callbacks.
 guidata(hObject, handles);
+
+
+% --- Executes on button press in btnLifeTimePolyROI.
+function btnLifeTimePolyROI_Callback(hObject, eventdata, handles)
+% hObject    handle to btnLifeTimePolyROI (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Get all handles.
+handles = guidata(hObject);
+
+% We will always define the ROI on the left axes.
+axes(handles.axesLeft);
+
+% If we previously defined a rectangular ROI, delete it.
+if isfield(handles, 'rect')
+    delete(handles.rect)
+end
+
+bitmask = roipoly(getimage(gca));
+
+%test = handles.rawdata{1,2}(bitmask);
+
+guidata(hObject, handles);
+
+
+lifetimeHist(handles.rawdata{1,2}(bitmask), 4096, 1E9 / handles.SYNCrate);
