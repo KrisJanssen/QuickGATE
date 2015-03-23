@@ -529,7 +529,14 @@ if isfield(handles, 'rect')
     delete(handles.rect)
 end
 
-bitmask = roipoly(getimage(gca));
+
+I = getimage(gca);
+
+figure
+
+bitmask = roipoly(I);
+
+imshow(bitmask);
 
 %test = handles.rawdata{1,2}(bitmask);
 
