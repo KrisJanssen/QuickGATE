@@ -274,13 +274,13 @@ Overflow = 0;
 Marker = 0;
 
 %% The actual rendering
-
+test = ftell(fid);
 % Read the actual data from disk as uint32.
 Data = uint32(fread(fid, 'uint32'));
 
 % Close the file handle, all data is in memory now.
 fclose(fid);
-
+%profile on
 % Extract rudimentary info from the data:
 % 1) Time tag is an int representation of the event in terms of macro time.
 % 2) Channel holds the REVERSE start-stop channel (i.e.) time bin.
@@ -393,14 +393,19 @@ MaximumReverseStartStop_ns =  MaximumBin * Board_Resolution;
 % Photons that are closer than a minimum start-stop time will actually be 
 % referenced to 'third' pulse, relative to the pulse that triggered the 
 % photon. To get 'real', 'forward' start-stop times, we need to perform
-% some corrections. If a specific s-s time fals within the SYNC period, we
+% some corrections. If a specific s-s time falls within the SYNC period, we
 % substract its value from SYNC period to get the 'forward' s-s value. If
 % its value is larger than SYNC period, we substract the reverse s-s- time
 % from TWICE the SYNC period. The SYNC period is available as SYNCRATE in
 % Hz, so we need to take into account proper conversions of time (s vs ns).
 ChannelCorrected_s = double(Channel);
 
-RevStartStopTime_s = double(Channel) * Board_Resolution * 1.0E-09;
+RevStartStopTime_s = (double(Channel) * Board_Resolution * 1.0E-09) - (MinimumBin * Board_Resolution * 1.0E-09);
+
+% For debug purposes.
+% figure
+% hist(double(RevStartStopTime_s(Valid)) * 1E9,4096);
+% title('shift channel data histogram (ns)')
 
 % For debug purposes.
 % figure
@@ -418,7 +423,9 @@ ChannelCorrected_s(RevStartStopTime_s <= 1.0 / SYNCRate) = ...
 
 % For debug purposes.
 % figure
-% hist(double(ChannelCorrected_s(Valid)) * 1E9,4096);
+[ counts, centers ] = hist(double(ChannelCorrected_s(Valid)) * 1E9,4096);
+countsclean = transpose(counts(find(counts)));
+centersclean = transpose(centers(find(counts)));
 % title('Corrected channel data histogram (ns)')
 
 % Calculate the real start stop time range for reporting.
@@ -520,6 +527,6 @@ messages = strcat(...
     sprintf('\n%5.2f (ns) MIN Start-Stop\n', MinimumStartStop_ns),...
     sprintf('\n%5.2f (ns) MAX Start-Stop\n', MaximumStartStop_ns));
 
-%profile viewer
-%profile off
+% profile viewer
+% profile off
 end
