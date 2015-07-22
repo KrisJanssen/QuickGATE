@@ -207,7 +207,7 @@ function uipushopen_ClickedCallback(hObject, eventdata, handles)
 % hObject    handle to uipushopen (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-[file, path] = uigetfile('*.t3r','Select a file');
+[file, path] = uigetfile('*.ptu;*.t3r','Select a file');
 
 if path == 0
     return

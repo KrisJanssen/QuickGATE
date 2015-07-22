@@ -14,11 +14,13 @@ function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractImageT3R( filepa
 %   gmax:       Actually applied upper bound gating time in ns (coerced)
 %   messages:   Some information on the processed file
 
-%% Load some header info for debug display to console
-% Demo for accessing TimeHarp TTTR data files (*.t3r) from MATLAB
-% TimeHarp 200, Software version 6.x, Format version 6.0
+% This file is inspred by the "Demo for accessing TimeHarp TTTR data files 
+% (*.t3r) from MATLAB" example, as supplied with the TimeHarp 200, 
+% Software version 6.x, Format version 6.0
 % Tested with Matlab  6 and 7
 % Peter Kapusta, PicoQuant GmbH, February 2009
+
+% Adaptation by Kris Janssen, 2014
 
 % NOTE:
 % TTTR records are written to [t3r file name].txt 
@@ -27,6 +29,8 @@ function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractImageT3R( filepa
 % e.g. if your files are not too big. 
 % Otherwise it is best process the data on the fly and keep only the results.
 %profile('on', '-detail', 'builtin')
+
+%% Load some header info for debug display to console
 
 fprintf(1,'\n');
 
@@ -44,13 +48,12 @@ fprintf(1,'\n');
 %
 
 Ident = fread(fid, 16, '*char');
-fprintf(1,'Ident: %s\n', Ident);
 
 FormatVersion = deblank(char(fread(fid, 6, 'char')'));
 fprintf(1,'Format version: %s\n', FormatVersion);
 
 if not(strcmp(FormatVersion,'6.0'))
-   fprintf(1,'\n\n      Warning: This program is for version 6.0 only. Aborted.');
+   fprintf(1,'\n\n Warning: This program is for version 6.0 only. Aborted.');
    STOP;
 end;
 
@@ -274,7 +277,7 @@ Overflow = 0;
 Marker = 0;
 
 %% The actual rendering
-test = ftell(fid);
+
 % Read the actual data from disk as uint32.
 Data = uint32(fread(fid, 'uint32'));
 

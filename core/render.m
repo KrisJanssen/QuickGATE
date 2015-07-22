@@ -15,8 +15,17 @@ switch updateaxes
         gmax = 100;
 end
 
-[ ImageData, gmin, gmax, SYNCrate, messages ] = ...
-            ExtractImageT3R(strcat(handles.path, handles.file), gmin, gmax);  
+filepath = strcat(handles.path, handles.file);
+
+type = IdentifyFile(filepath);
+
+if strcmp(type, 'TH200')
+    [ ImageData, gmin, gmax, SYNCrate, messages ] = ...
+            ExtractImageT3R(filepath, gmin, gmax); 
+elseif strcmp(type, 'PTU')
+    [ ImageData, gmin, gmax, SYNCrate, messages ] = ...
+            ExtractImagePTU(filepath, gmin, gmax); 
+end 
 
 updateUI(hObject, ...
     ImageData{1,1}(:,:), ...
