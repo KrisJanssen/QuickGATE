@@ -22,7 +22,7 @@ function varargout = QuickGATE(varargin)
 
 % Edit the above text to modify the response to help QuickGATE
 
-% Last Modified by GUIDE v2.5 23-Mar-2015 10:39:27
+% Last Modified by GUIDE v2.5 23-Jul-2015 04:37:12
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;

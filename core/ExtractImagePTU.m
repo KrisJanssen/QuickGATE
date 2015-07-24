@@ -140,9 +140,9 @@ while 1
         otherwise
             error('Illegal Type identifier found! Broken file?');
     end;
-    if strcmp(EvalName, 'TTResult_SyncRate')
-        TTResult_SyncRate = TagInt;
-    end
+%     if strcmp(EvalName, 'TTResult_SyncRate')
+%         TTResult_SyncRate = TagInt;
+%     end
     if strcmp(TagIdent, 'Header_End')
         break
     end
@@ -204,11 +204,11 @@ cnt_ma = 0;
 switch TTResultFormat_TTTRRecType;
     case rtHydraHarpT3
         [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImage( ...
-            Data, gmin, gmax, MeasDesc_GlobalResolution, TTResult_SyncRate);
+            Data, gmin, gmax, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate);
     case {rtHydraHarp2T3, rtTimeHarp260NT3, rtTimeHarp260PT3}
         isT2 = false;
         [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImage( ...
-            Data, gmin, gmax, MeasDesc_GlobalResolution, TTResult_SyncRate);
+            Data, gmin, gmax, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate);
     otherwise
         error('Illegal RecordType!');
 end;

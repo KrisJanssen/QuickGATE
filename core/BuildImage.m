@@ -1,4 +1,4 @@
-function [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImage( Data, gmin, gmax, GlobalResolution, SYNCRate )
+function [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImage( Data, gmin, gmax, GlobalResolution, HWResolution, SYNCRate )
 %BUILDIMAGE Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -37,10 +37,9 @@ FrameMarkerIndices = find(Special & (Channel == 1));
 % For the moment, we look at the first frame only.
 LineMarkerIndices = find(Special(1:FrameMarkerIndices(2,1)) & (Channel(1:FrameMarkerIndices(2,1)) == 2));
 
-
 % We assume square images so the number of lines is the number of pixels in
 % each dimension (X&Y).
-pixels = size(LineMarkerIndices,1);
+pixels = size(LineMarkerIndices,1) / 2;
 
 % Reconstruct the absolute time tags along the experiment time axis (macro 
 % time).
@@ -61,45 +60,59 @@ pixels = size(LineMarkerIndices,1);
 % SI units.
 
 % Get a 'logical' array indicating overflow. Overflow is encoded as value
-% 63 in the Channel data.
-Overflows = bitand(Channel,63) ~= 0;
+% 63 in the Channel data but a logical array is nicer to work with
+% downstream.
+Overflows = zeros(size(Channel,1),1);
+Overflows(Channel == 63) = 1;
 
-% AbsoluteTimeTag can be calculated in a vectorized fashion.
-% If Overflows is:
-% [ 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0 0 ]
-% cumsum will yield:
-% [ 0 0 1 1 1 1 1 2 2 2 2 2 3 3 3 3 4 4 4 ]
-% We need to shift this by one position to the right since the overflow
-% only needs to be applied starting from the record following its
-% occurence:
-% [ P P O P P P P O P P P P O P P P O P P ] (P = photon, O = overflow).
-% The shift:
-% [ 0 0 0 1 1 1 1 1 2 2 2 2 2 3 3 3 3 4 4 4 ]
+% AbsoluteTimeTag (macro time) can be calculated in a vectorized fashion.
 %
-% At each overflow event, the counter might have rolled over multiple
-% times. The amount of roll-overs is stored in TimeTag. Therefore, we need
-% to calculate the correction BEFORE the cumulative sum to reconstruct
-% macrotime for each record.
-AbsoluteTimeTag = uint32([0 ; cumsum(uint32(Overflows) .* (TimeTag .* T3WRAPAROUND))]);
-AbsoluteTimeTag = AbsoluteTimeTag(1:end-1);
+% If overflow happens, TimeTag will contain the number of roll-overs of the
+% macro time count register. For any roll-over record, the true macro time
+% can be calculated as follows:
+% AbsoluteTimeTag = AbsoluteTimeTag + TimeTag * T3WRAPAROUND.
+%
+% HOWEVER, for markers and photons, TimeTag holds the number of macro time
+% 'ticks' of that particular event relative to the global macro time count. 
+% Thus, TimeTag values for marker or photon records have a slightly
+% different meaning.
+% Therefore, to get the real macro time of a marker or a photon one needs
+% to add the value of TimeTag for that event to AbsoluteTimeTag but this
+% addition should NOT be permanently added to AbsoluteTimeTag for the
+% calculation of later events.
+%
+% The above calculation can effectively be vectorized by doing an element
+% wise multiplication of Overflow, TimeTag and T3WRAPAROUND and construction 
+% of a cumulative sum of that result.
+%
+% If Overflows is:
+% [ 1 1 0 0 1 1 0 ]
+% If TimeTag is:
+% [ 1023 1023 23 500 1023 500 10 ]
+% We get Overflows .* TimeTag .* T3WRAPAROUND (constant 1024):
+% [ 1047552 1047552 0 0 1047442 512000 0 ] 
+% Yields:
+% Result = [1047552 2095104 2095104 2095104 3142546 3654546 3654546]
+% This is the correct monotone increase of macro time count.
+% To reconstruct the actual macro time for the events corresponding to
+% Overflow == 0 we can do:
+% Result(~Overflow) = Result(~Overflow) + TimeTag(~Overflow) which is eq
+% to:
+% [1047552 2095104 2095104 + 23 2095104 + 500 3142546 3654546 3654546 + 10]
+AbsoluteTimeTag = cumsum(uint32(Overflows) .* (TimeTag .* uint32(T3WRAPAROUND)));
+AbsoluteTimeTag(~Overflows) = AbsoluteTimeTag(~Overflows) + TimeTag(~Overflows);
 
 % Get the count of overflows as NoOfOverflows
 NoOfOverflows = sum(Overflows);
 
-% We get the specific indices of the FIRST (hence the find (..., 1) frame- 
-% and line markers. These are the INVALID (no photons!) records of type 
-% marker with values 1 and 2 respectively. 
-LineEnd = find(Special & Channel == 2, 1);
-FrameStart = find(Special & Channel == 1, 1);
+% There is a marker in te first pixel of a line and in the last one. These
+% will be the firs and second element in the trigger array.
+LineDuration = AbsoluteTimeTag(LineMarkerIndices(2)) - AbsoluteTimeTag(LineMarkerIndices(1));
 
-% We therefore need to look up the corresponding index in "AbsoluteTimeTag" 
-% because we are interested in absolute time. 
-LineDuration = AbsoluteTimeTag(LineEnd) - AbsoluteTimeTag(FrameStart);
-
-% The duration of a pixel.
-PixelDuration = round(LineDuration / pixels);
-
-% Gating variables.
+% The duration of a pixel. Since the line ending trigger fires in the last
+% pixel, the duration between the rising edge of line start and the rising
+% edge of line end is actually the duration of lines per pixel minus 1.
+PixelDuration = double(LineDuration) / double(pixels-1);
 
 % Check we have sensible values for gating. If not, flip them around/coerce 
 % them.
@@ -124,58 +137,25 @@ MaximumBin = double(max(dTime(~Special)));
 % For debug
 %rawChannelExcel = dTime(~Special);
 
-% Correct Channel
-% Channel = Channel - uint32(MinimumBin);
-% [ Y, X ] = hist(double(Channel(Valid)),4096);
-% X = X(find(Y))';
-% Y = Y(find(Y))';
-% % alculate the real start stop time range for reporting.
-MinimumReverseStartStop_ns =  MinimumBin * GlobalResolution;
-MaximumReverseStartStop_ns =  MaximumBin * GlobalResolution;
+% Calculate the real start stop time range for reporting.
+MinimumReverseStartStop_ns =  MinimumBin * HWResolution;
+MaximumReverseStartStop_ns =  MaximumBin * HWResolution;
 
-% Photons that are closer than a minimum start-stop time will actually be 
-% referenced to 'third' pulse, relative to the pulse that triggered the 
-% photon. To get 'real', 'forward' start-stop times, we need to perform
-% some corrections. If a specific s-s time falls within the SYNC period, we
-% substract its value from SYNC period to get the 'forward' s-s value. If
-% its value is larger than SYNC period, we substract the reverse s-s- time
-% from TWICE the SYNC period. The SYNC period is available as SYNCRATE in
-% Hz, so we need to take into account proper conversions of time (s vs ns).
-ChannelCorrected_s = double(dTime);
-
-RevStartStopTime_s = ...
-    (double(dTime) * GlobalResolution * 1.0E-09) - ...
-    (MinimumBin * GlobalResolution * 1.0E-09);
-
-% For debug purposes.
-%figure
-%hist(double(RevStartStopTime_s(~Special)) * 1E9,4096);
-%title('shift channel data histogram (ns)')
+ChannelCorrected_s = ...
+    (double(dTime) * HWResolution) - ...
+    (MinimumBin * HWResolution);
 
 % For debug purposes.
 % figure
-% plot(double(Channel(Valid)));
-% title('Raw channel data (Reverse start-stop)')
-% figure
-% hist(double(Channel(Valid)),4096);
-% title('Raw channel data histogram (Reverse start-stop)')
-
-ChannelCorrected_s(RevStartStopTime_s >= 1.0 / SYNCRate) = ...
-    2.0 / SYNCRate - RevStartStopTime_s(RevStartStopTime_s >= 1.0 / SYNCRate);
-
-ChannelCorrected_s(RevStartStopTime_s <= 1.0 / SYNCRate) = ...
-    1.0 / SYNCRate - RevStartStopTime_s(RevStartStopTime_s <= 1.0 / SYNCRate);
-
-% For debug purposes.
-% figure
-[ counts, centers ] = hist(double(ChannelCorrected_s(Special)) * 1E9,4096);
-countsclean = transpose(counts(find(counts)));
-centersclean = transpose(centers(find(counts)));
+% hist(double(ChannelCorrected_s(~Special)) * 1E9,65536);
+% [ counts, centers ] = hist(double(ChannelCorrected_s(~Special)) * 1E9,65536);
+% countsclean = transpose(counts(find(counts)));
+% centersclean = transpose(centers(find(counts)));
 % title('Corrected channel data histogram (ns)')
 
 % Calculate the real start stop time range for reporting.
-MinimumStartStop_ns =  double(min(ChannelCorrected_s(Special))) * 1.0E9;
-MaximumStartStop_ns =  double(max(ChannelCorrected_s(Special))) * 1.0E9;
+MinimumStartStop_ns =  double(min(ChannelCorrected_s(~Special))) * 1.0E9;
+MaximumStartStop_ns =  double(max(ChannelCorrected_s(~Special))) * 1.0E9;
 
 % Now that we finally have 'forward' start stop times, which have an actual
 % physical meaning, we can get a logical indexer signifying compliance 
@@ -193,7 +173,7 @@ GatingLogical = ...
 %
 % The very first line starts at frame marker and runs to the first line
 % marker.
-CurrentLineStart = FrameStart;
+CurrentLineStart = LineMarkerIndices(1);
 
 % Pre-allocate the image data store, including start stop times. 
 %
@@ -202,14 +182,16 @@ CurrentLineStart = FrameStart;
 % cell array. The layout of which is explained below.
 ImageData = { zeros(pixels,pixels) , cell(pixels, pixels) };
 
-% For correct pixel parsing, we create an array of pixel indices which is
-% front to back.
-PixelIndices = uint32(flipud( [ 1:pixels ]'));
+% For correct pixel parsing, we create an array of pixel indices.
+PixelIndices = uint32( [ 1:pixels ]' );
+
+% Keep track of lines during processing.
+CurrentLine = 1;
 
 % Cycle through the lines.
-for i=1:pixels
+for i=1:2:2*(pixels - 1)
     
-    CurrentLineEnd = LineMarkerIndices(i);
+    CurrentLineEnd = LineMarkerIndices(i + 1);
     
     % The records that are on the current line. Limiting operations to
     % these records might speed up operations.
@@ -228,17 +210,17 @@ for i=1:pixels
     % Values range from linemarker - 399 * PixelDuration to 
     %                   linemarker - 000 * PixelDuration
     PixelEnd = ...
-        AbsoluteTimeTag(LineMarkerIndices(i)) - (PixelIndices - 1) * PixelDuration;
-    
+         AbsoluteTimeTag(CurrentLineStart) + (PixelIndices * PixelDuration);
+
     % We now bin the photonrecords that fall within the gating boundaries 
     % by these pixel end times.
-    ImageData{1,1}(i, :, 1) = histc(LineData(LineGatingLogical & LineValid), PixelEnd);
-    
+    ImageData{1,1}(CurrentLine, :, 1) = histc(LineData(LineGatingLogical & ~LineValid), PixelEnd);
+   
     % We next want to group start stop times per pixel. So here, we do not
     % need gating. We will also use the bin numbers instead of their
     % contents. Indeed, PixelIndex holds the pixel number of each valid
     % record in the current line.
-    [ ~ , PixelIndex ] = histc(LineData(LineValid), PixelEnd);
+    [ ~ , PixelIndex ] = histc(LineData(~LineValid), PixelEnd);
     
     % The PixelIndex (bins) are 0 based, so we add one for later array
     % indexing.
@@ -248,16 +230,17 @@ for i=1:pixels
     % they belong in a cell array. If a certain bin index is not present,
     % an empty cell will be inserted, unless we are at the end, then
     % nothing will be added.
-    PixelLifeTimes = accumarray(PixelIndex, LineChannelCorrected_s(LineValid), [], @(x) {x});
+    PixelLifeTimes = accumarray(PixelIndex, LineChannelCorrected_s(~LineValid), [], @(x) {x});
     
     % This is line data so make a row cell array.
     PixelLifeTimes = PixelLifeTimes';
     
     % Store the lifetimes.
-    ImageData{1,2}(i,1:length(PixelLifeTimes)) = PixelLifeTimes;
+    ImageData{1,2}(CurrentLine,1:length(PixelLifeTimes)) = PixelLifeTimes;
     
     % Proceed to the next line marker.
-    CurrentLineStart = LineMarkerIndices(i);
+    CurrentLineStart = LineMarkerIndices(i + 2);
+    CurrentLine = CurrentLine + 1;
     
 end
 
@@ -266,7 +249,7 @@ messages = strcat(...
     sprintf('\n%u photon records', size(find(Special),1)),...
     sprintf('\n%u overflows', NoOfOverflows),...
     sprintf('\n%u Line markers\n', pixels),...
-    sprintf('\n%5.2f (ms) Pixel Dwell time\n', double(PixelDuration) * 100E-6),...
+    sprintf('\n%5.2f (ms) Pixel Dwell time\n', double(PixelDuration) * GlobalResolution * 1E3),...
     sprintf('\n%5.2f (ns) MIN rev Start-Stop\n', MinimumReverseStartStop_ns),...
     sprintf('\n%5.2f (ns) MAX rev Start-Stop\n', MaximumReverseStartStop_ns),...
     sprintf('\n%5.2f (ns) MIN Start-Stop\n', MinimumStartStop_ns),...
