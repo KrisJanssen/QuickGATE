@@ -22,7 +22,7 @@ function varargout = QuickGATE(varargin)
 
 % Edit the above text to modify the response to help QuickGATE
 
-% Last Modified by GUIDE v2.5 23-Jul-2015 04:37:12
+% Last Modified by GUIDE v2.5 31-Jul-2015 08:54:45
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -544,3 +544,12 @@ guidata(hObject, handles);
 
 
 lifetimeHist(handles.rawdata{1,2}(bitmask), 4096, 1E9 / handles.SYNCrate);
+
+
+% --- Executes on button press in btnLTColor.
+function btnLTColor_Callback(hObject, eventdata, handles)
+% hObject    handle to btnLTColor (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+lifeTimeColor(handles.rawdata{1,2}(1:end,1:end), 4096, 1E9 / handles.SYNCrate);
