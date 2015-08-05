@@ -1,4 +1,4 @@
-function [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImage( Data, gmin, gmax, GlobalResolution, HWResolution, SYNCRate )
+function [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImage( Data, gmin, gmax, tshift, GlobalResolution, HWResolution, SYNCRate )
 %BUILDIMAGE Summary of this function goes here
 %   Detailed explanation goes here
 
@@ -210,7 +210,7 @@ for i=1:2:2*(pixels - 1)
     % Values range from linemarker - 399 * PixelDuration to 
     %                   linemarker - 000 * PixelDuration
     PixelEnd = ...
-         AbsoluteTimeTag(CurrentLineStart) + (PixelIndices * PixelDuration);
+         AbsoluteTimeTag(CurrentLineStart) + (PixelIndices * PixelDuration) + (tshift / GlobalResolution);
 
     % We now bin the photonrecords that fall within the gating boundaries 
     % by these pixel end times.

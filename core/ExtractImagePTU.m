@@ -1,4 +1,4 @@
-function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractImagePTU( filepath, gmin, gmax )
+function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractImagePTU( filepath, gmin, gmax, tshift )
 % Read PicoQuant Unified TTTR Files
 % This code is based on an example written by Marcus Sackrow,
 % PicoQUant GmbH, December 2013.
@@ -204,11 +204,11 @@ cnt_ma = 0;
 switch TTResultFormat_TTTRRecType;
     case rtHydraHarpT3
         [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImage( ...
-            Data, gmin, gmax, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate);
+            Data, gmin, gmax, tshift, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate);
     case {rtHydraHarp2T3, rtTimeHarp260NT3, rtTimeHarp260PT3}
         isT2 = false;
         [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImage( ...
-            Data, gmin, gmax, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate);
+            Data, gmin, gmax, tshift, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate);
     otherwise
         error('Illegal RecordType!');
 end;

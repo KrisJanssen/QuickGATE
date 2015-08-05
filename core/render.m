@@ -3,6 +3,8 @@ function [ gmin, gmax ] = render(hObject, updateaxes)
 % Get all handles.
 handles = guidata(hObject);
 
+tshift = str2double(get(handles.txtShift, 'string'));
+
 switch updateaxes
     case 'left'
         gmin = str2double(get(handles.lowGateLeft, 'string'));
@@ -21,10 +23,10 @@ type = IdentifyFile(filepath);
 
 if strcmp(type, 'TH200')
     [ ImageData, gmin, gmax, SYNCrate, messages ] = ...
-            ExtractImageT3R(filepath, gmin, gmax); 
+            ExtractImageT3R(filepath, gmin, gmax, tshift); 
 elseif strcmp(type, 'PTU')
     [ ImageData, gmin, gmax, SYNCrate, messages ] = ...
-            ExtractImagePTU(filepath, gmin, gmax); 
+            ExtractImagePTU(filepath, gmin, gmax, tshift); 
 end 
 
 updateUI(hObject, ...
