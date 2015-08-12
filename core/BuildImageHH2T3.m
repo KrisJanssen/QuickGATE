@@ -1,5 +1,5 @@
-function [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImage( Data, gmin, gmax, tshift, GlobalResolution, HWResolution, SYNCRate )
-%BUILDIMAGE Summary of this function goes here
+function [ ImageData, gmin, gmax, SYNCRate, summary ] = BuildImageHH2T3( Data, frame, gmin, gmax, tshift, GlobalResolution, ArrivalTimerResolution, SYNCRate, frametype )
+%BuildImageHH2T3 Generate images from HydraHarp 2 T3 data.
 %   Detailed explanation goes here
 
 %% The actual rendering
@@ -17,44 +17,67 @@ function [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImage( Data, gmin,
 % The overflow counter wrap-around value.
 T3WRAPAROUND = 1024;
 
-% The macro time record
-TimeTag = bitand(Data(:),1023);                             %the lowest 10 bits
+% The macro time record in the lowest 10 bits
+TimeTag = bitand(Data(:),1023);
 
-% Reverse start-stop time
-dTime = bitand(bitshift(Data(:),-10),32767);                %the next 15 bits
+% Start-stop time in the next 15 bits
+dTime = bitand(bitshift(Data(:),-10),32767);
 
 % Indicator/value of record type (overflow (63)/marker (1 - 15)/photon (0))
-Channel = bitand(bitshift(Data(:),-25),63);                 %the next 6 bits
+% in the next 6 bits
+Channel = bitand(bitshift(Data(:),-25),63);                 
 
-% 1 for Overflow and marker, 0 for photons
-Special   = logical(bitand(bitshift(Data(:),-31),1));       %the next bit
+% 1 for Overflow and marker, 0 for photons in the final bit.
+Special   = logical(bitand(bitshift(Data(:),-31),1));       
 
 % We will store indices of line markers for later use. To do so, we check 
 % which records are Special, i.e. do not contain photon arrival data and 
 % we check that a specific marker value exists. (1 = frame, 2 = line start)
-FrameMarkerIndices = find(Special & (Channel == 1));
+if frametype == 1
+    FrameMarkerIndices = [ 1; find(Special & (Channel == 1))];
+    NoOfFrames = nnz(FrameMarkerIndices) - 1;
+elseif frametype == 2
+    FrameMarkerIndices = find(Special & (Channel == 1));
+    NoOfFrames = nnz(FrameMarkerIndices) / 2;
+end
 
-% For the moment, we look at the first frame only.
-LineMarkerIndices = find(Special(1:FrameMarkerIndices(2,1)) & (Channel(1:FrameMarkerIndices(2,1)) == 2));
+if frame > NoOfFrames
+    error('No such frame!')
+end
+
+if frametype == 1
+    start = frame;
+    stop = start + 1;
+elseif frametype == 2
+    start = (frame * 2) - 1;
+    stop = start + 1;
+end
+
+LineMarkerIndices = find( ...
+   Special(FrameMarkerIndices(start, 1):FrameMarkerIndices(stop, 1)) & ...
+   Channel(FrameMarkerIndices(start, 1):FrameMarkerIndices(stop, 1)) == 2);
 
 % We assume square images so the number of lines is the number of pixels in
 % each dimension (X&Y).
 pixels = size(LineMarkerIndices,1) / 2;
 
+% Since we know the frame we are working in, we can safely work on that
+% data only. Particularly since the LineMarker indices will already be
+% numbered relative to this limited range of records.
+TimeTag = TimeTag((FrameMarkerIndices(start, 1):FrameMarkerIndices(stop, 1)));
+dTime = dTime((FrameMarkerIndices(start, 1):FrameMarkerIndices(stop, 1)));
+Channel = Channel((FrameMarkerIndices(start, 1):FrameMarkerIndices(stop, 1)));       
+Special   = Special((FrameMarkerIndices(start, 1):FrameMarkerIndices(stop, 1)));
+
 % Reconstruct the absolute time tags along the experiment time axis (macro 
 % time).
 %
-% The TSPC can only count to 2^16 so if an experiment takes longer, it
-% counts the overflows of the macro time counter.
+% The TSPC can only count to T3WRAPAROUND so if an experiment takes longer,
+% it counts the overflows of the macro time counter.
 %
 % We need the absolute macro time to reconstruct the image. Once we have 
-% the absolute macro time, we can work out the delta between Frame trigger 
-% and the first line trigger, i.e. the time it takes to complete a scan
-% line. 
-%
-% Moreover, having worked out the duration of the scanline, we can
-% calculate back from the line marker such that we can easily get rid of
-% the photons generated during the return of the galvo.
+% the absolute macro time, we can work out the delta between two 
+% consecutive line triggers.
 %
 % Calculated absolute values are still uint32! No need to convert to 'real'
 % SI units.
@@ -115,7 +138,8 @@ LineDuration = AbsoluteTimeTag(LineMarkerIndices(2)) - AbsoluteTimeTag(LineMarke
 PixelDuration = double(LineDuration) / double(pixels-1);
 
 % Check we have sensible values for gating. If not, flip them around/coerce 
-% them.
+% them. If the are coerced it is obviously important to send them back out 
+% to the user, hence the out parameters.
 if gmin >= gmax
     PixelChannelCorrected_s = gmin;
     gmin = gmax;
@@ -126,11 +150,11 @@ else
     end  
 end
 
-% In reality, not all reverse start-stop time bins of the TCSPC will be 
-% filled. Moreover, some bins will contain photons with apparent arrival 
-% times that greatly exceed the SYNC period.
+% It might be that, not all reverse start-stop time bins of the TCSPC will 
+% be filled. Moreover, some bins might contain photons with apparent 
+% arrival times that appear to exceed the SYNC period.
 % We will check these values now such that we can act accordingly later on
-% Or at the very least report them to the user.
+% or at the very least report them to the user.
 MinimumBin = double(min(dTime(~Special)));
 MaximumBin = double(max(dTime(~Special)));
 
@@ -138,12 +162,14 @@ MaximumBin = double(max(dTime(~Special)));
 %rawChannelExcel = dTime(~Special);
 
 % Calculate the real start stop time range for reporting.
-MinimumReverseStartStop_ns =  MinimumBin * HWResolution;
-MaximumReverseStartStop_ns =  MaximumBin * HWResolution;
+MinimumReverseStartStop_ns =  MinimumBin * ArrivalTimerResolution;
+MaximumReverseStartStop_ns =  MaximumBin * ArrivalTimerResolution;
 
-ChannelCorrected_s = ...
-    (double(dTime) * HWResolution) - ...
-    (MinimumBin * HWResolution);
+% Convert arrival time in ticks of the hardware counter to real-world
+% seconds (SI units!)
+dTime_s = ...
+    (double(dTime) * ArrivalTimerResolution) - ...
+    (MinimumBin * ArrivalTimerResolution);
 
 % For debug purposes.
 % figure
@@ -154,16 +180,16 @@ ChannelCorrected_s = ...
 % title('Corrected channel data histogram (ns)')
 
 % Calculate the real start stop time range for reporting.
-MinimumStartStop_ns =  double(min(ChannelCorrected_s(~Special))) * 1.0E9;
-MaximumStartStop_ns =  double(max(ChannelCorrected_s(~Special))) * 1.0E9;
+MinimumStartStop_ns =  double(min(dTime_s(~Special))) * 1.0E9;
+MaximumStartStop_ns =  double(max(dTime_s(~Special))) * 1.0E9;
 
 % Now that we finally have 'forward' start stop times, which have an actual
 % physical meaning, we can get a logical indexer signifying compliance 
 % with the gating condition. Again we convert gating times in ns to s. We
 % are greedy with this check (we include gmin and gmax itself.
 GatingLogical = ...
-    (gmin * 1E-09 <= ChannelCorrected_s) & ...
-    (gmax * 1E-09 >= ChannelCorrected_s);
+    (gmin * 1E-09 <= dTime_s) & ...
+    (gmax * 1E-09 >= dTime_s);
 
 % We will construct image pixel values by counting the number of photon
 % records that fall in a certain time bin of duration PixelDuration. For
@@ -198,7 +224,7 @@ for i=1:2:2*(pixels - 1)
     LineData = AbsoluteTimeTag(CurrentLineStart:CurrentLineEnd);
     LineValid = Special(CurrentLineStart:CurrentLineEnd);
     LineGatingLogical = GatingLogical(CurrentLineStart:CurrentLineEnd);
-    LineChannelCorrected_s = ChannelCorrected_s(CurrentLineStart:CurrentLineEnd);
+    LineChannelCorrected_s = dTime_s(CurrentLineStart:CurrentLineEnd);
     
     % Pixel generation is basically the same as constructing a histogram 
     % with edges on the pixel end timepoints.
@@ -244,7 +270,7 @@ for i=1:2:2*(pixels - 1)
     
 end
 
-messages = strcat(...
+summary = strcat(...
     sprintf('\nStatistics:\n'),...
     sprintf('\n%u photon records', size(find(Special),1)),...
     sprintf('\n%u overflows', NoOfOverflows),...

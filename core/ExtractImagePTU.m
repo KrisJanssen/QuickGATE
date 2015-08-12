@@ -34,6 +34,9 @@ rtTimeHarp260PT3 = hex2dec('00010306');% (SubID = $00 ,RecFmt: $01) (V1), T-Mode
 rtTimeHarp260PT2 = hex2dec('00010206');% (SubID = $00 ,RecFmt: $01) (V1), T-Mode: $02 (T2), HW: $06 (TimeHarp260P)
 
 %% Globals for subroutines
+
+% TODO: I don't like the use of globals. Check if this cannot be solved in
+% a more elegant way.
 global fid
 global TTResultFormat_TTTRRecType;
 global TTResult_NumberOfRecords; % Number of TTTR Records in the File;
@@ -46,9 +49,8 @@ TTResult_NumberOfRecords = 0;
 MeasDesc_Resolution = 0;
 MeasDesc_GlobalResolution = 0;
 
-
 %% Start reading header data
-fid=fopen(filepath);
+fid = fopen(filepath);
 
 fprintf(1,'\n');
 Magic = fread(fid, 8, '*char');
@@ -64,7 +66,9 @@ fprintf(1,'Tag Version: %s\n', Version);
 while 1
     % read Tag Head
     TagIdent = fread(fid, 32, '*char'); % TagHead.Ident
-    TagIdent = (TagIdent(TagIdent ~= 0))'; % remove #0 and more more readable
+    
+    % TagIdent is initiallly a column vector. Flip it.
+    TagIdent = (TagIdent(TagIdent ~= 0))'; 
     TagIdx = fread(fid, 1, 'int32');    % TagHead.Idx
     TagTyp = fread(fid, 1, 'uint32');   % TagHead.Typ
     % TagHead.Value will be read in the
@@ -140,18 +144,16 @@ while 1
         otherwise
             error('Illegal Type identifier found! Broken file?');
     end;
-%     if strcmp(EvalName, 'TTResult_SyncRate')
-%         TTResult_SyncRate = TagInt;
-%     end
+
     if strcmp(TagIdent, 'Header_End')
         break
     end
 end
 fprintf(1, '\n----------------------\n');
 
-
 %% Check recordtype
 global isT2;
+
 switch TTResultFormat_TTTRRecType;
     case rtPicoHarpT3
         isT2 = false;
@@ -187,28 +189,19 @@ switch TTResultFormat_TTTRRecType;
         error('Illegal RecordType!');
 end;
 
-% Read the actual data from disk as uint32.
+% Read the actual data (non-header content) from disk as uint32.
 Data = uint32(fread(fid, 'uint32'));
 
 % Close the file handle, all data is in memory now.
 fclose(fid);
 
-%% Render the data
-global cnt_ph;
-global cnt_ov;
-global cnt_ma;
-cnt_ph = 0;
-cnt_ov = 0;
-cnt_ma = 0;
-% choose right decode function
+%% Render the data. 
+% MeasDesc_GlobalResolution is the macro time resolution
+% MeasDesc_Resolution is the arrival time resolution
 switch TTResultFormat_TTTRRecType;
-    case rtHydraHarpT3
-        [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImage( ...
-            Data, gmin, gmax, tshift, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate);
-    case {rtHydraHarp2T3, rtTimeHarp260NT3, rtTimeHarp260PT3}
-        isT2 = false;
-        [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImage( ...
-            Data, gmin, gmax, tshift, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate);
+    case rtHydraHarp2T3
+        [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImageHH2T3( ...
+            Data, 1, gmin, gmax, tshift, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate, 2);
     otherwise
         error('Illegal RecordType!');
 end;
