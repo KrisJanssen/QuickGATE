@@ -240,32 +240,6 @@ plot(X,Y)
 figure 
 plot(f,Y)
 
-
-% --- Executes on button press in chkColorBar.
-function chkColorBar_Callback(hObject, eventdata, handles)
-% hObject    handle to chkColorBar (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hint: get(hObject,'Value') returns toggle state of chkColorBar
-if get(hObject,'Value')
-    axes(handles.axesLeft);
-    colorbar('northoutside');
-    axis square;
-    axes(handles.axesRight);
-    colorbar('northoutside');
-    axis square;
-else
-    axes(handles.axesLeft);
-    colorbar('delete');
-    axis square;
-
-    axes(handles.axesRight);
-    colorbar('delete');
-    axis square;
-end
-
-
 % --- Executes on button press in btnLTROI.
 function btnLTROI_Callback(hObject, eventdata, handles)
 % hObject    handle to btnLTROI (see GCBO)
