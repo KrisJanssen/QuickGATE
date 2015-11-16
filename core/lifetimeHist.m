@@ -30,13 +30,13 @@ fitStart = find(histData == max(histData(1:fitEnd)), 1);
 fitSingle = fit(edges(fitStart:fitEnd)',histData(fitStart:fitEnd)','exp1')
 fitDouble = fit(edges(fitStart:fitEnd)',histData(fitStart:fitEnd)','exp2')
 
-%figure
-%[ nel, cent ] = hist(startstop_ns,edges,100)
+%figure;
+%[ nel, cent ] = hist(startstop_ns,edges,100);
 
 % Generate a figure.
 figure;
 % Plot the histogram.
-% plot(edges,histData,'--b');
+plot(edges,histData,'--b');
 % x = edges';
 % y = histData';
 hold on

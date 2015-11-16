@@ -1,4 +1,4 @@
-function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractImagePTU( filepath, frame, gmin, gmax, tshift )
+function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractMultiImagePTU( filepath, gmin, gmax, tshift )
 % Read PicoQuant Unified TTTR Files
 % This code is based on an example written by Marcus Sackrow,
 % PicoQUant GmbH, December 2013.
@@ -190,7 +190,6 @@ switch TTResultFormat_TTTRRecType;
 end;
 
 % Read the actual data (non-header content) from disk as uint32.
-
 offset = ftell(fid);
 %Data = uint32(fread(fid, 'uint32'));
 
@@ -207,8 +206,22 @@ Data = memmapfile(filepath,...
 % MeasDesc_Resolution is the arrival time resolution
 switch TTResultFormat_TTTRRecType;
     case rtHydraHarp2T3
-        [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImageHH2T3( ...
-            Data, frame, gmin, gmax, tshift, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate, 2);
+        [path, name, ext] = fileparts(filepath);
+        
+        [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildMultiImageHH2T3( ...
+            Data, gmin, gmax, tshift, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate, 2);
+        
+        blah = size(ImageData, 2);
+        
+        for i = 1:size(ImageData, 2)
+            cmap = hot(max(ImageData{1,i}(:)));
+            % Make values 0-5 black:
+            cmap(1:5,:) = zeros(5,3);
+            colormap(cmap);
+            %ImageData{1,i}(ImageData{1,i} < 5) = 0;
+            imwrite(ImageData{1,i}(:,:), cmap, strcat(path, '/', name, '_', num2str(i), '.jpg'));
+        end
+        
     otherwise
         error('Illegal RecordType!');
 end;

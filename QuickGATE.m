@@ -526,7 +526,40 @@ function btnLTColor_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-lifeTimeColor(handles.rawdata{1,2}(1:end,1:end), 4096, 1E9 / handles.SYNCrate);
+% Get all handles.
+handles = guidata(hObject);
+
+% We will always define the ROI on the left axes.
+axes(handles.axesLeft);
+
+% Get an ROI.
+h = imrect;
+
+% If we previously defined an ROI, delete it.
+if isfield(handles, 'rect')
+    delete(handles.rect)
+end
+
+% Get the extents of the ROI returned as coordinates top left X, top left
+% Y, width, height.
+pos = int32(round(getPosition(h)));
+
+x1 = pos(1,1);
+x2 = pos(1,3) + x1 - 1;
+
+y1 = pos(1,2);
+y2 = pos(1,4) + y1 - 1;
+
+% Store the handle to the just-defined ROI.
+handles.rect = h;
+guidata(hObject, handles);
+
+
+%lifetimeHist(handles.rawdata{1,2}(y1:y2,x1:x2), 4096, 1E9 / handles.SYNCrate);
+
+%lifeTimeColor(handles.rawdata{1,2}(1:end,1:end), 4096, 1E9 / handles.SYNCrate);
+
+lifeTimeColor(handles.rawdata{1,2}(y1:y2,x1:x2), 4096, 1E9 / handles.SYNCrate);
 
 
 

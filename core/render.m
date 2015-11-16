@@ -23,10 +23,10 @@ type = IdentifyFile(filepath);
 
 if strcmp(type, 'TH200')
     [ ImageData, gmin, gmax, SYNCrate, messages ] = ...
-            ExtractImageT3R(filepath, gmin, gmax, tshift); 
+            ExtractImageT3R(filepath, 32, gmin, gmax, tshift); 
 elseif strcmp(type, 'PTU')
     [ ImageData, gmin, gmax, SYNCrate, messages ] = ...
-            ExtractImagePTU(filepath, gmin, gmax, tshift); 
+            ExtractImagePTU(filepath, 32, gmin, gmax, tshift); 
 end 
 
 updateUI(hObject, ...

@@ -1,4 +1,4 @@
-function [ ImageData, gmin, gmax, SYNCRate, summary ] = BuildImageHH2T3( Data, frame, gmin, gmax, tshift, GlobalResolution, ArrivalTimerResolution, SYNCRate, frametype )
+function [ ImageData, gmin, gmax, SYNCRate, summary ] = BuildImageHH2T3( m, frame, gmin, gmax, tshift, GlobalResolution, ArrivalTimerResolution, SYNCRate, frametype )
 %BuildImageHH2T3 Generate images from HydraHarp 2 T3 data.
 %   Detailed explanation goes here
 
@@ -13,22 +13,22 @@ function [ ImageData, gmin, gmax, SYNCRate, summary ] = BuildImageHH2T3( Data, f
 % All data records are 32 bit numbers. By using AND and SHIFT operations
 % with correct values, we can extract sub-bits holding particular
 % information.
-
+frame = 1;
 % The overflow counter wrap-around value.
 T3WRAPAROUND = 1024;
 
 % The macro time record in the lowest 10 bits
-TimeTag = bitand(Data(:),1023);
+TimeTag = bitand(m.Data(:),1023);
 
 % Start-stop time in the next 15 bits
-dTime = bitand(bitshift(Data(:),-10),32767);
+dTime = bitand(bitshift(m.Data(:),-10),32767);
 
 % Indicator/value of record type (overflow (63)/marker (1 - 15)/photon (0))
 % in the next 6 bits
-Channel = bitand(bitshift(Data(:),-25),63);                 
+Channel = bitand(bitshift(m.Data(:),-25),63);                 
 
 % 1 for Overflow and marker, 0 for photons in the final bit.
-Special   = logical(bitand(bitshift(Data(:),-31),1));       
+Special   = logical(bitand(bitshift(m.Data(:),-31),1));       
 
 % We will store indices of line markers for later use. To do so, we check 
 % which records are Special, i.e. do not contain photon arrival data and 
