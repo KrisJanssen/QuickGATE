@@ -1,4 +1,4 @@
-function [ ImageData, gmin, gmax, SYNCRate, summary ] = BuildMultiImageHH2T3( m, gmin, gmax, tshift, GlobalResolution, ArrivalTimerResolution, SYNCRate, frametype )
+function [ ImageData, gmin, gmax, SYNCRate, summary ] = BuildMultiImageHH2T3( m, gmin, gmax, tshift, fskip, GlobalResolution, ArrivalTimerResolution, SYNCRate, frametype, bidir )
 %BuildImageHH2T3 Generate images from HydraHarp 2 T3 data.
 %   Detailed explanation goes here
 
@@ -38,6 +38,7 @@ if frametype == 1
     NoOfFrames = nnz(FrameMarkerIndices) - 1;
 elseif frametype == 2
     FrameMarkerIndices = find(Special & (Channel == 1));
+    FrameMarkerIndices = FrameMarkerIndices((1 + fskip):end);
     NoOfFrames = nnz(FrameMarkerIndices) / 2;
 end
 
@@ -223,6 +224,8 @@ for frame = 1:NoOfFrames
     % Keep track of lines during processing.
     CurrentLine = 1;
     
+    evenodd = 1;
+    
     % Cycle through the lines.
     for i=1:2:2*(pixels - 1)
         
@@ -248,11 +251,19 @@ for frame = 1:NoOfFrames
         
         % We now bin the photonrecords that fall within the gating boundaries
         % by these pixel end times.
-        ImageData{1,frame}(CurrentLine, :, 1) = histc(LineData(LineGatingLogical & ~LineValid), PixelEnd);
+            
+        if (bidir && mod(evenodd, 2) == 0)
+            %ImageData{1,frame}(CurrentLine, :) = histc(LineData(LineGatingLogical & ~LineValid), PixelEnd);
+            ImageData{1,frame}(CurrentLine, :) = flip(histc(LineData(LineGatingLogical & ~LineValid), PixelEnd));
+        else
+            ImageData{1,frame}(CurrentLine, :) = histc(LineData(LineGatingLogical & ~LineValid), PixelEnd);
+        end
         
         % Proceed to the next line marker.
         CurrentLineStart = LineMarkerIndices(i + 2);
         CurrentLine = CurrentLine + 1;
+        
+        evenodd = evenodd + 1;
         
     end
     

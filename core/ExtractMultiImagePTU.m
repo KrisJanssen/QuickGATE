@@ -1,4 +1,4 @@
-function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractMultiImagePTU( filepath, gmin, gmax, tshift )
+function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractMultiImagePTU( filepath, gmin, gmax, tshift, fskip, bidir )
 % Read PicoQuant Unified TTTR Files
 % This code is based on an example written by Marcus Sackrow,
 % PicoQUant GmbH, December 2013.
@@ -209,9 +209,7 @@ switch TTResultFormat_TTTRRecType;
         [path, name, ext] = fileparts(filepath);
         
         [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildMultiImageHH2T3( ...
-            Data, gmin, gmax, tshift, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate, 2);
-        
-        blah = size(ImageData, 2);
+            Data, gmin, gmax, tshift, fskip, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate, 2, bidir);
         
         for i = 1:size(ImageData, 2)
             cmap = hot(max(ImageData{1,i}(:)));
@@ -219,8 +217,11 @@ switch TTResultFormat_TTTRRecType;
             cmap(1:5,:) = zeros(5,3);
             colormap(cmap);
             %ImageData{1,i}(ImageData{1,i} < 5) = 0;
-            imwrite(ImageData{1,i}(:,:), cmap, strcat(path, '/', name, '_', num2str(i), '.jpg'));
+            imwrite(ImageData{1,i}(:,:), cmap, strcat(path, '/', name, '_', num2str(i), '.tif'));
         end
+        
+        figure
+        imshow(ImageData{1,1}(:,:), cmap);
         
     otherwise
         error('Illegal RecordType!');
