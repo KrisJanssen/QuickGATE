@@ -45,8 +45,8 @@ end
 NoOfFrames = floor(NoOfFrames);
 
 LineMarkerIndices = find( ...
-    Special(FrameMarkerIndices(1, 1):FrameMarkerIndices(2, 1)) & ...
-    Channel(FrameMarkerIndices(1, 1):FrameMarkerIndices(2, 1)) == 2);
+    Special(FrameMarkerIndices(1, 1):FrameMarkerIndices(3, 1)) & ...
+    Channel(FrameMarkerIndices(1, 1):FrameMarkerIndices(3, 1)) == 2);
 
 % We assume square images so the number of lines is the number of pixels in
 % each dimension (X&Y).
@@ -66,7 +66,7 @@ for frame = 1:NoOfFrames
         stop = start + 1;
     elseif frametype == 2
         start = (frame * 2) - 1;
-        stop = start + 1;
+        stop = start + 2;
     end
     
 %     LineMarkerIndices = find( ...
@@ -85,6 +85,10 @@ for frame = 1:NoOfFrames
     LineMarkerIndices = find( ...
         SpecialTemp & ...
         ChannelTemp == 2);
+    
+    CurrentFrameIndices = find( ...
+        SpecialTemp & ...
+        ChannelTemp == 1);
     
     % Reconstruct the absolute time tags along the experiment time axis (macro
     % time).
@@ -148,11 +152,17 @@ for frame = 1:NoOfFrames
     % There is a marker in te first pixel of a line and in the last one. These
     % will be the firs and second element in the trigger array.
     LineDuration = AbsoluteTimeTag(LineMarkerIndices(2)) - AbsoluteTimeTag(LineMarkerIndices(1));
+    FrameDuration = AbsoluteTimeTag(CurrentFrameIndices(2,1)) - AbsoluteTimeTag(CurrentFrameIndices(1,1));
+    InterFrameDuration = AbsoluteTimeTag(CurrentFrameIndices(3,1)) - AbsoluteTimeTag(CurrentFrameIndices(1,1));
     
     % The duration of a pixel. Since the line ending trigger fires in the last
     % pixel, the duration between the rising edge of line start and the rising
     % edge of line end is actually the duration of lines per pixel minus 1.
     PixelDuration = double(LineDuration) / double(pixels-1);
+    
+    frameTime = double(FrameDuration) * GlobalResolution
+    frameRate = 1.0 / (double(InterFrameDuration) * GlobalResolution)
+    dwellTime = PixelDuration * GlobalResolution
     
     % Check we have sensible values for gating. If not, flip them around/coerce
     % them. If the are coerced it is obviously important to send them back out
