@@ -15,7 +15,7 @@ classdef App < handle
         
         function onNewFile(obj, ~, ~)
             ImModel = Model.Image;
-            ImModel.source = obj.model.files{1};
+            ImModel.source = obj.model.files{end:end};
             ImView = View.Image(ImModel);
             ImCtrl = Controller.Image(ImView);
         end

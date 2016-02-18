@@ -1,4 +1,4 @@
-function [ ImageData, gmin, gmax, SYNCRate, summary ] = BuildImageHH2T3( m, frame, gmin, gmax, tshift, GlobalResolution, ArrivalTimerResolution, SYNCRate, frametype )
+function [ ImageData, NoOfFrames, SYNCRate, summary ] = BuildImageHH2T3( m, frame, gmin, gmax, tshift, GlobalResolution, ArrivalTimerResolution, SYNCRate, frametype, bidir  )
 %BuildImageHH2T3 Generate images from HydraHarp 2 T3 data.
 %   Detailed explanation goes here
 
@@ -214,6 +214,9 @@ PixelIndices = uint32( [ 1:pixels ]' );
 % Keep track of lines during processing.
 CurrentLine = 1;
 
+evenodd = 1;
+
+
 % Cycle through the lines.
 for i=1:2:2*(pixels - 1)
     
@@ -240,7 +243,12 @@ for i=1:2:2*(pixels - 1)
 
     % We now bin the photonrecords that fall within the gating boundaries 
     % by these pixel end times.
-    ImageData{1,1}(CurrentLine, :, 1) = histc(LineData(LineGatingLogical & ~LineValid), PixelEnd);
+    if (bidir && mod(evenodd, 2) == 0)
+        %ImageData{1,frame}(CurrentLine, :) = histc(LineData(LineGatingLogical & ~LineValid), PixelEnd);
+        ImageData{1,1}(CurrentLine, :) = flip(histc(LineData(LineGatingLogical & ~LineValid), PixelEnd));
+    else
+        ImageData{1,1}(CurrentLine, :, 1) = histc(LineData(LineGatingLogical & ~LineValid), PixelEnd);
+    end
    
     % We next want to group start stop times per pixel. So here, we do not
     % need gating. We will also use the bin numbers instead of their
@@ -268,7 +276,10 @@ for i=1:2:2*(pixels - 1)
     CurrentLineStart = LineMarkerIndices(i + 2);
     CurrentLine = CurrentLine + 1;
     
+    evenodd = evenodd + 1;
+    
 end
+
 
 summary = strcat(...
     sprintf('\nStatistics:\n'),...

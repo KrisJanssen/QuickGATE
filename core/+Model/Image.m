@@ -3,12 +3,13 @@ classdef Image < handle
     %   TODO: Add.
     
     properties (SetObservable = true)
-        isdirty = 0;
         source
         tshift = 0.0;
         gate = [0 100]; 
         frame = 1;
         disprange = [0 100];
+        bidir = 0;
+        noframes = 1;
     end
     
     events
@@ -38,6 +39,10 @@ classdef Image < handle
 %             end
         end
         
+        function dirty(obj)
+            notify(obj, 'Dirty')
+        end
+        
         function image = render(obj)
 %             % Get the desired frame.
 %             data = obj.source.getframe(obj.frame, obj.tshift);
@@ -50,13 +55,14 @@ classdef Image < handle
 %                     data(i,:)));
 %             end
 
-              [ imagefull, ~, ~, ~, ~ ] = ...
+              [ imagefull, obj.noframes, ~, ~ ] = ...
                   ExtractImagePTU( ...
                   obj.source, ...
                   obj.frame, ...
                   obj.gate(1,1), ...
                   obj.gate(1,2), ...
-                  0 );
+                  0, ...
+                  obj.bidir);
               
               image = imagefull{1,1};
         end

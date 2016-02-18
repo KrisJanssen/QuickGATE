@@ -1,4 +1,4 @@
-function [ ImageData, gmin, gmax, SYNCRate, messages ] = ExtractImagePTU( filepath, frame, gmin, gmax, tshift )
+function [ ImageData, NoOfFrames, SYNCRate, messages ] = ExtractImagePTU( filepath, frame, gmin, gmax, tshift, bidir )
 % Read PicoQuant Unified TTTR Files
 % This code is based on an example written by Marcus Sackrow,
 % PicoQUant GmbH, December 2013.
@@ -207,8 +207,8 @@ Data = memmapfile(filepath,...
 % MeasDesc_Resolution is the arrival time resolution
 switch TTResultFormat_TTTRRecType;
     case rtHydraHarp2T3
-        [ ImageData, gmin, gmax, SYNCRate, messages ] = BuildImageHH2T3( ...
-            Data, frame, gmin, gmax, tshift, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate, 2);
+        [ ImageData, NoOfFrames, SYNCRate, messages ] = BuildImageHH2T3( ...
+            Data, frame, gmin, gmax, tshift, MeasDesc_GlobalResolution, MeasDesc_Resolution, TTResult_SyncRate, 2, bidir);
     otherwise
         error('Illegal RecordType!');
 end;
