@@ -13,7 +13,7 @@ function [ ImageData, gmin, gmax, SYNCRate, summary ] = BuildImageHH2T3( m, fram
 % All data records are 32 bit numbers. By using AND and SHIFT operations
 % with correct values, we can extract sub-bits holding particular
 % information.
-frame = 1;
+%frame = 1;
 % The overflow counter wrap-around value.
 T3WRAPAROUND = 1024;
 

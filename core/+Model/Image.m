@@ -1,13 +1,18 @@
 classdef Image < handle
-    %UNTITLED Summary of this class goes here
-    %   Detailed explanation goes here
+    %IMAGE The Image Model.
+    %   TODO: Add.
     
     properties (SetObservable = true)
         isdirty = 0;
         source
         tshift = 0.0;
-        gate = [0 100.0E-09]; 
+        gate = [0 100]; 
         frame = 1;
+        disprange = [0 100];
+    end
+    
+    events
+        Dirty
     end
     
     methods
@@ -22,41 +27,39 @@ classdef Image < handle
             end
             
             obj.gate = gateIn;
-            obj.flipdirty;
         end
         
         function set.source(obj,sourceIn)
-            if isa(sourceIn, 'Data.TCSPCImageData')
-                obj.source = sourceIn;
-                obj.flipdirty;
-            else
-                obj.source = 0;
-            end
+            obj.source = sourceIn;
+%             if isa(sourceIn, 'Data.TCSPCImageData')
+%                 obj.source = sourceIn;
+%             else
+%                 obj.source = 0;
+%             end
         end
         
         function image = render(obj)
-            % Get the desired frame.
-            data = obj.source.getframe(obj.frame, obj.tshift);
-            % Allocate space for the image.
-            image = zeros(size(data));
-            % Apply gate and build image.
-            for i=1:1:size(data, 1)
-                image(i,:) = cell2mat(cellfun( ...
-                    @(x){sum(x >= obj.gate(1) & x <= obj.gate(2))}, ...
-                    data(i,:)));
-            end
+%             % Get the desired frame.
+%             data = obj.source.getframe(obj.frame, obj.tshift);
+%             % Allocate space for the image.
+%             image = zeros(size(data));
+%             % Apply gate and build image.
+%             for i=1:1:size(data, 1)
+%                 image(i,:) = cell2mat(cellfun( ...
+%                     @(x){sum(x >= obj.gate(1) & x <= obj.gate(2))}, ...
+%                     data(i,:)));
+%             end
+
+              [ imagefull, ~, ~, ~, ~ ] = ...
+                  ExtractImagePTU( ...
+                  obj.source, ...
+                  obj.frame, ...
+                  obj.gate(1,1), ...
+                  obj.gate(1,2), ...
+                  0 );
+              
+              image = imagefull{1,1};
         end
-    end
-    
-    methods (Access = private)
-        function flipdirty(obj)
-            if obj.isdirty == 0
-                obj.isdirty = 1;
-            else
-                obj.isdirty = 0;
-            end
-        end
-        
     end
     
 end
