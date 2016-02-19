@@ -22,14 +22,6 @@ classdef Image < handle
             % Observe model changes and update view accordingly
             addlistener(model, 'Dirty', ...
                 @obj.onModelChanged);
-%             addlistener(model, 'frame', 'PostSet', ...
-%                 @obj.onModelChanged);
-%             addlistener(model, 'gate', 'PostSet', ...
-%                 @obj.onModelChanged);
-%             addlistener(model, 'disprange', 'PostSet', ...
-%                 @obj.onModelChanged);
-%             addlistener(model, 'bidir', 'PostSet', ...
-%                 @obj.onModelChanged);
             
         end
         
@@ -143,14 +135,16 @@ classdef Image < handle
                 'lblnoframes', hLblnoframes, ...
                 'btndwn', hBtndwn);
             
+            movegui(hFig, 'center');
+            
         end
         
         function onModelChanged(obj, ~, ~)
-            image = obj.model.render();
-            Min = max(max(image(:))) * obj.model.disprange(1,1) / 100.0;
-            Max = max(max(image(:))) * obj.model.disprange(1,2) / 100.0;
+            Min = obj.model.maxcount * obj.model.disprange(1,1) / 100.0;
+            Max = obj.model.maxcount * obj.model.disprange(1,2) / 100.0;
+            colormap(hot)
             set(obj.handles.fig, 'CurrentAxes', obj.handles.axes);
-            imagesc(image, [ Min, Max ]);
+            imagesc(obj.model.image, [ Min, Max ]);
             colorbar(obj.handles.axes);
             set(obj.handles.edtfr, 'String', num2str(obj.model.frame));
             set(obj.handles.lblnoframes, 'String', num2str(obj.model.noframes));

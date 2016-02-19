@@ -10,6 +10,11 @@ classdef Image < handle
         disprange = [0 100];
         bidir = 0;
         noframes = 1;
+        image = [];
+        lifetimes = {};
+        maxcount;
+        mincount;
+        
     end
     
     events
@@ -18,6 +23,22 @@ classdef Image < handle
     
     methods
         function obj = Image()
+        end
+        
+        function out = get.maxcount(obj)
+            if ~isempty(obj.image)
+                out = max(max(obj.image(:)));
+            else
+                out = 0;
+            end
+        end
+        
+        function out = get.mincount(obj)
+            if ~isempty(obj.image)
+                out = min(min(obj.image(:)));
+            else
+                out = 0;
+            end
         end
         
         function set.gate(obj, gateIn)
@@ -32,6 +53,7 @@ classdef Image < handle
         
         function set.source(obj,sourceIn)
             obj.source = sourceIn;
+            obj.dirty()
 %             if isa(sourceIn, 'Data.TCSPCImageData')
 %                 obj.source = sourceIn;
 %             else
@@ -40,21 +62,12 @@ classdef Image < handle
         end
         
         function dirty(obj)
+            obj.render()
             notify(obj, 'Dirty')
         end
         
-        function image = render(obj)
-%             % Get the desired frame.
-%             data = obj.source.getframe(obj.frame, obj.tshift);
-%             % Allocate space for the image.
-%             image = zeros(size(data));
-%             % Apply gate and build image.
-%             for i=1:1:size(data, 1)
-%                 image(i,:) = cell2mat(cellfun( ...
-%                     @(x){sum(x >= obj.gate(1) & x <= obj.gate(2))}, ...
-%                     data(i,:)));
-%             end
-
+        function render(obj)
+            
               [ imagefull, obj.noframes, ~, ~ ] = ...
                   ExtractImagePTU( ...
                   obj.source, ...
@@ -64,7 +77,8 @@ classdef Image < handle
                   0, ...
                   obj.bidir);
               
-              image = imagefull{1,1};
+              obj.image = imagefull{1,1};
+              obj.lifetimes = imagefull{1,2};
         end
     end
     

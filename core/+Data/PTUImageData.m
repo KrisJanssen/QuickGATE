@@ -34,10 +34,9 @@ classdef PTUImageData < Data.TCSPCImageData
             Magic = fread(fid, 8, '*char');
             
             if not(strcmp(Magic(Magic~=0)','PQTTTR'))
-                
                 error('Magic invalid, this is not a PTU file.');
             else
-                [ data, ~ ] =  obj.ExtractImagePTU( fid, idx, tshift );
+                [ data, NoOfFrames, ~, ~ ] =  obj.ExtractImagePTU( fid, idx, tshift );
             end;
 
         end
