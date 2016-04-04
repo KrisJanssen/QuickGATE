@@ -18,17 +18,17 @@ function [ ImageData, NoOfFrames, SYNCRate, summary ] = BuildImageHH2T3( m, fram
 T3WRAPAROUND = 1024;
 
 % The macro time record in the lowest 10 bits
-TimeTag = bitand(m.Data(:),1023);
+TimeTag = uint64(bitand(m.Data(:),1023));
 
 % Start-stop time in the next 15 bits
-dTime = bitand(bitshift(m.Data(:),-10),32767);
+dTime = uint64(bitand(bitshift(m.Data(:),-10),32767));
 
 % Indicator/value of record type (overflow (63)/marker (1 - 15)/photon (0))
 % in the next 6 bits
-Channel = bitand(bitshift(m.Data(:),-25),63);                 
+Channel = uint64(bitand(bitshift(m.Data(:),-25),63));                 
 
 % 1 for Overflow and marker, 0 for photons in the final bit.
-Special   = logical(bitand(bitshift(m.Data(:),-31),1));       
+Special   = uint64(logical(bitand(bitshift(m.Data(:),-31),1)));       
 
 % We will store indices of line markers for later use. To do so, we check 
 % which records are Special, i.e. do not contain photon arrival data and 
@@ -122,7 +122,8 @@ Overflows(Channel == 63) = 1;
 % Result(~Overflow) = Result(~Overflow) + TimeTag(~Overflow) which is eq
 % to:
 % [1047552 2095104 2095104 + 23 2095104 + 500 3142546 3654546 3654546 + 10]
-AbsoluteTimeTag = cumsum(uint32(Overflows) .* (TimeTag .* uint32(T3WRAPAROUND)));
+%AbsoluteTimeTag = cumsum(uint32(Overflows) .* (TimeTag .* uint32(T3WRAPAROUND)));
+AbsoluteTimeTag = cumsum(uint64(Overflows) .* (uint64(TimeTag) .* uint64(T3WRAPAROUND)));
 AbsoluteTimeTag(~Overflows) = AbsoluteTimeTag(~Overflows) + TimeTag(~Overflows);
 
 % Get the count of overflows as NoOfOverflows
@@ -209,7 +210,11 @@ CurrentLineStart = LineMarkerIndices(1);
 ImageData = { zeros(pixels,pixels) , cell(pixels, pixels) };
 
 % For correct pixel parsing, we create an array of pixel indices.
-PixelIndices = uint32( [ 1:pixels ]' );
+% Pixel Bin edges, specified as a vector will be defined below.
+% Here, edges(1) is the left edge of the first bin, and edges(end) is the 
+% right edge of the last bin. We thus need to define pixels + 1 edges for
+% histcounts to work.
+PixelIndices = uint64( [ 0:pixels ]' );
 
 % Keep track of lines during processing.
 CurrentLine = 1;
@@ -238,23 +243,27 @@ for i=1:2:2*(pixels - 1)
     % is reversed.
     % Values range from linemarker - 399 * PixelDuration to 
     %                   linemarker - 000 * PixelDuration
-    PixelEnd = ...
-         AbsoluteTimeTag(CurrentLineStart) + (PixelIndices * PixelDuration) + (tshift / GlobalResolution);
+    PixEges = ...
+         AbsoluteTimeTag(CurrentLineStart) + ...
+         (PixelIndices * PixelDuration) + ...
+         (tshift / GlobalResolution);
 
     % We now bin the photonrecords that fall within the gating boundaries 
     % by these pixel end times.
     if (bidir && mod(evenodd, 2) == 0)
-        %ImageData{1,frame}(CurrentLine, :) = histc(LineData(LineGatingLogical & ~LineValid), PixelEnd);
-        ImageData{1,1}(CurrentLine, :) = flip(histc(LineData(LineGatingLogical & ~LineValid), PixelEnd));
+        ImageData{1,1}(CurrentLine, :) = ...
+            flip(...
+            histcounts(LineData(LineGatingLogical & ~LineValid), PixEges));
     else
-        ImageData{1,1}(CurrentLine, :, 1) = histc(LineData(LineGatingLogical & ~LineValid), PixelEnd);
+        ImageData{1,1}(CurrentLine, :, 1) = ...
+            histcounts(LineData(LineGatingLogical & ~LineValid), PixEges);
     end
    
     % We next want to group start stop times per pixel. So here, we do not
     % need gating. We will also use the bin numbers instead of their
     % contents. Indeed, PixelIndex holds the pixel number of each valid
     % record in the current line.
-    [ ~ , PixelIndex ] = histc(LineData(~LineValid), PixelEnd);
+    [ ~ , ~, PixelIndex ] = histcounts(LineData(~LineValid), PixEges);
     
     % The PixelIndex (bins) are 0 based, so we add one for later array
     % indexing.
