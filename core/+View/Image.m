@@ -150,6 +150,12 @@ classdef Image < handle
             set(obj.handles.lblnoframes, 'String', num2str(obj.model.noframes));
         end
         
+        % TODO: Check if this is sufficient and does not result in memory
+        % leaks.
+        function delete(obj)
+            close(obj.handles.fig);
+        end 
+        
     end
     
 end

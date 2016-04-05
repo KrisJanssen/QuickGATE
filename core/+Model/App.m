@@ -12,22 +12,17 @@ classdef App < handle
     end
     
     events
-        NewFile
+        FileOpen
+        FileClose
     end
     
     methods
+        
+        % The App model binds all components together. Therefore we can
+        % pass in all of its dependencies here such as e.g. a File Manager,
+        % an ROI Manager or perhaps logging classes.
         function obj = App(filemanager)
             obj.filemanager = filemanager;
-            
-            % Observe model changes and update view accordingly.
-            addlistener(filemanager, 'files', 'PostSet', ...
-                @obj.onModelChanged);
-        end
-        
-        function onModelChanged(obj, ~, ~)
-            notify(obj, 'NewFile');
-            test = size(obj.filemanager.files)
-
         end
         
         function out = get.files(obj)
